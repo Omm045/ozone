@@ -257,5 +257,26 @@ void main() {
       expect(result.downloadUrl, 'https://github.com/Omm045/ozone/releases/tag/v1.0.2');
       expect(result.releaseNotes, 'Bug fixes and performance improvements.');
     });
+
+    test('Live GitHub Releases API integration test: detects v1.0.1 against previous 1.0.0 build', () async {
+      final result = await UpdateChecker.checkForUpdates(
+        explicitCurrentVersion: '1.0.0',
+      );
+
+      expect(result.status, UpdateStatus.updateAvailable);
+      expect(result.isUpdateAvailable, isTrue);
+      expect(result.latestVersion, '1.0.1');
+      expect(result.downloadUrl, 'https://github.com/Omm045/ozone/releases/tag/v1.0.1');
+    });
+
+    test('Live GitHub Releases API integration test: reports up to date against current 1.0.1+2 build', () async {
+      final result = await UpdateChecker.checkForUpdates(
+        explicitCurrentVersion: '1.0.1+2',
+      );
+
+      expect(result.status, UpdateStatus.upToDate);
+      expect(result.isUpdateAvailable, isFalse);
+      expect(result.latestVersion, '1.0.1');
+    });
   });
 }
