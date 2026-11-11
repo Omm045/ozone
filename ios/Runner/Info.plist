@@ -4,6 +4,11 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>voip</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Ozone requires camera access for HD and 4K video calling.</string>
 	<key>NSMicrophoneUsageDescription</key>

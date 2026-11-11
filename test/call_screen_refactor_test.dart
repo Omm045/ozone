@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:ozone/core/webrtc/adaptive_quality_controller.dart';
 import 'package:ozone/core/webrtc/camera_constraint_selector.dart';
 import 'package:ozone/core/webrtc/sdp_utils.dart';
 import 'package:ozone/core/webrtc/webrtc_call_manager.dart';
 import 'package:ozone/design_system/quality_indicator_widget.dart';
-import 'package:ozone/features/call/call_screen.dart';
-import 'package:ozone/models/user_model.dart';
 import 'package:ozone/models/call_session.dart';
 
 void main() {
