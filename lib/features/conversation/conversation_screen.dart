@@ -6,6 +6,7 @@ import '../../core/database/chat_repository.dart';
 import '../../models/chat_model.dart';
 import '../../models/chat_message.dart';
 import '../../models/user_model.dart';
+import '../../models/call_session.dart';
 import '../../design_system/ozone_theme.dart';
 import '../call/call_screen.dart';
 
@@ -58,9 +59,67 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
-  void _startCall(UserModel currentUser, String targetEmail) async {
-    // Lookup callee UserModel
-    final targetUser = await widget.chatRepository.lookupUserByEmail(targetEmail);
+  Future<void> _confirmDeleteMessage(BuildContext context, ChatMessage message) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: OzoneTheme.surfaceCard,
+          title: const Text(
+            'Delete message?',
+            style: TextStyle(color: OzoneTheme.textPrimary, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'This message will be deleted for everyone in this chat.',
+            style: TextStyle(color: OzoneTheme.textSecondary, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              key: const Key('cancelDeleteMessageBtn'),
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel', style: TextStyle(color: OzoneTheme.textSecondary)),
+            ),
+            TextButton(
+              key: const Key('confirmDeleteMessageBtn'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: OzoneTheme.ruby, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await widget.chatRepository.deleteMessage(
+        chatId: widget.chat.id,
+        messageId: message.id,
+      );
+    }
+  }
+
+  void _startCall(
+    UserModel currentUser,
+    String targetEmail, {
+    CallType callType = CallType.video,
+  }) async {
+    // 1. Try email lookup
+    var targetUser = await widget.chatRepository.lookupUserByEmail(targetEmail);
+
+    // 2. Fall back to existing chat's known participant UID if user profile document lookup was delayed
+    if (targetUser == null) {
+      final otherUid = widget.chat.otherUserUid(currentUser.uid);
+      if (otherUid.isNotEmpty) {
+        targetUser = UserModel(
+          uid: otherUid,
+          email: targetEmail,
+          createdAt: DateTime.now(),
+        );
+      }
+    }
+
     if (!mounted) return;
 
     if (targetUser == null) {
@@ -76,8 +135,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
       MaterialPageRoute(
         builder: (_) => CallScreen(
           caller: currentUser,
-          callee: targetUser,
+          callee: targetUser!,
           isIncoming: false,
+          callType: callType,
         ),
       ),
     );
@@ -117,9 +177,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.phone_rounded, color: OzoneTheme.cyan, size: 22),
+            tooltip: 'Start Audio Call',
+            onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.audio),
+          ),
+          IconButton(
             icon: const Icon(Icons.videocam_rounded, color: OzoneTheme.cyan, size: 26),
             tooltip: 'Start Video Call (1080p -> 4K)',
-            onPressed: () => _startCall(currentUser, otherEmail),
+            onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.video),
           ),
         ],
       ),
@@ -170,63 +235,110 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       widget.chatRepository.markRead(widget.chat.id, msg.id);
                     }
 
+                    if (msg.isDeleted) {
+                      return Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          key: Key('deleted_msg_${msg.id}'),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white12, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.block_flipped, size: 13, color: Colors.white38),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Message deleted',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 13,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                DateFormat.jm().format(msg.timestamp),
+                                style: const TextStyle(
+                                  color: Colors.white24,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.75,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? OzoneTheme.cyan.withValues(alpha: 0.2)
-                              : OzoneTheme.surfaceCard,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(16),
-                            topRight: const Radius.circular(16),
-                            bottomLeft: Radius.circular(isMe ? 16 : 4),
-                            bottomRight: Radius.circular(isMe ? 4 : 16),
+                      child: GestureDetector(
+                        onLongPress: isMe ? () => _confirmDeleteMessage(context, msg) : null,
+                        onSecondaryTap: isMe ? () => _confirmDeleteMessage(context, msg) : null,
+                        child: Container(
+                          key: Key('msg_${msg.id}'),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
                           ),
-                          border: Border.all(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75,
+                          ),
+                          decoration: BoxDecoration(
                             color: isMe
-                                ? OzoneTheme.cyan.withValues(alpha: 0.5)
-                                : Colors.white10,
-                            width: 1,
+                                ? OzoneTheme.cyan.withValues(alpha: 0.2)
+                                : OzoneTheme.surfaceCard,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: Radius.circular(isMe ? 16 : 4),
+                              bottomRight: Radius.circular(isMe ? 4 : 16),
+                            ),
+                            border: Border.all(
+                              color: isMe
+                                  ? OzoneTheme.cyan.withValues(alpha: 0.5)
+                                  : Colors.white10,
+                              width: 1,
+                            ),
                           ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              msg.text,
-                              style: const TextStyle(
-                                color: OzoneTheme.textPrimary,
-                                fontSize: 15,
-                                height: 1.3,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  DateFormat.jm().format(msg.timestamp),
-                                  style: const TextStyle(
-                                    color: OzoneTheme.textSecondary,
-                                    fontSize: 10,
-                                  ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                msg.text,
+                                style: const TextStyle(
+                                  color: OzoneTheme.textPrimary,
+                                  fontSize: 15,
+                                  height: 1.3,
                                 ),
-                                if (isMe) ...[
-                                  const SizedBox(width: 4),
-                                  _buildReceiptIcon(msg.status),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    DateFormat.jm().format(msg.timestamp),
+                                    style: const TextStyle(
+                                      color: OzoneTheme.textSecondary,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    _buildReceiptIcon(msg.status),
+                                  ],
                                 ],
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );

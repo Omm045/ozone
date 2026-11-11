@@ -4,7 +4,7 @@ enum ResolutionTier {
     width: 1280,
     height: 720,
     targetFps: 30,
-    targetBitrateBps: 1500000,
+    targetBitrateBps: 2000000,
     minHeadroomForStepUpBps: 4000000,
     scaleResolutionDownBy: 1.5,
   ),
@@ -13,7 +13,7 @@ enum ResolutionTier {
     width: 1920,
     height: 1080,
     targetFps: 30,
-    targetBitrateBps: 3500000,
+    targetBitrateBps: 5000000,
     minHeadroomForStepUpBps: 9000000,
     scaleResolutionDownBy: 1.0,
   ),
@@ -22,7 +22,7 @@ enum ResolutionTier {
     width: 2560,
     height: 1440,
     targetFps: 30,
-    targetBitrateBps: 7000000,
+    targetBitrateBps: 10000000,
     minHeadroomForStepUpBps: 18000000,
     scaleResolutionDownBy: 1.0,
   ),
@@ -31,7 +31,7 @@ enum ResolutionTier {
     width: 3840,
     height: 2160,
     targetFps: 30,
-    targetBitrateBps: 15000000,
+    targetBitrateBps: 25000000, // 25 Mbps target taking advantage of high-bandwidth (up to 100 Mbps) connections
     minHeadroomForStepUpBps: 999999999,
     scaleResolutionDownBy: 1.0,
   );
@@ -172,6 +172,7 @@ class QualityIndicatorState {
   final double rttMs;
   final double bandwidthMbps;
   final double packetLossPercent;
+  final bool isAuto;
 
   const QualityIndicatorState({
     this.tier = ResolutionTier.p1080,
@@ -179,6 +180,7 @@ class QualityIndicatorState {
     this.rttMs = 45.0,
     this.bandwidthMbps = 5.0,
     this.packetLossPercent = 0.0,
+    this.isAuto = true,
   });
 
   int get signalStrength {
@@ -196,7 +198,9 @@ class QualityIndicatorState {
 
 class AdaptiveQualityController {
   ResolutionTier _currentTier;
+  ResolutionTier? _manualTier;
   final int consecutiveGoodSamplesRequired;
+  bool deviceSupports60Fps = false;
 
   int _consecutiveGoodSamples = 0;
   NetworkStatsSample? _lastSample;
@@ -205,13 +209,35 @@ class AdaptiveQualityController {
   AdaptiveQualityController({
     ResolutionTier initialTier = ResolutionTier.p1080,
     this.consecutiveGoodSamplesRequired = 3,
-  }) : _currentTier = initialTier;
+    ResolutionTier? manualTier,
+    this.deviceSupports60Fps = false,
+  })  : _currentTier = manualTier ?? initialTier,
+        _manualTier = manualTier;
 
   ResolutionTier get currentTier => _currentTier;
+  ResolutionTier? get manualTier => _manualTier;
+  bool get isAuto => _manualTier == null;
   int get consecutiveGoodSamples => _consecutiveGoodSamples;
+
+  int get currentTargetFps =>
+      (deviceSupports60Fps && _currentTier >= ResolutionTier.p1080) ? 60 : 30;
+
+  void setManualTier(ResolutionTier? tier) {
+    _manualTier = tier;
+    _consecutiveGoodSamples = 0;
+    if (tier != null) {
+      _currentTier = tier;
+      onTierChanged?.call(tier);
+    }
+  }
 
   QualityAction processSample(NetworkStatsSample sample) {
     _lastSample = sample;
+
+    // When manually locked to a fixed tier, respect that tier as both ceiling and floor.
+    if (_manualTier != null) {
+      return const QualityStable();
+    }
 
     // 1. Evaluate degradation first (smooth step down, never freeze/drop)
     final degradation = _evaluateDegradation(sample);
@@ -265,14 +291,16 @@ class AdaptiveQualityController {
         NetworkStatsSample(
           availableBandwidthBps: _currentTier.targetBitrateBps.toDouble(),
           roundTripTimeMs: 40.0,
+          currentFps: currentTargetFps,
         );
 
     return QualityIndicatorState(
       tier: _currentTier,
-      fps: sample.currentFps,
+      fps: sample.currentFps > 0 ? sample.currentFps : currentTargetFps,
       rttMs: sample.roundTripTimeMs,
       bandwidthMbps: sample.availableBandwidthBps / 1000000.0,
       packetLossPercent: sample.packetLossRate * 100.0,
+      isAuto: isAuto,
     );
   }
 

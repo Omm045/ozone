@@ -5,6 +5,7 @@ class ChatModel {
   final String? lastMessageText;
   final DateTime? lastMessageTimestamp;
   final DateTime updatedAt;
+  final List<String> hiddenFor;
 
   const ChatModel({
     required this.id,
@@ -13,7 +14,13 @@ class ChatModel {
     this.lastMessageText,
     this.lastMessageTimestamp,
     required this.updatedAt,
+    this.hiddenFor = const [],
   });
+
+  bool isHiddenFor(String uid) => hiddenFor.contains(uid);
+
+  bool get isPendingInvite =>
+      id.startsWith('invite_') || participantUids.contains('pending_invite');
 
   static String deterministicChatId(String uid1, String uid2) {
     return uid1.compareTo(uid2) < 0 ? '${uid1}_$uid2' : '${uid2}_$uid1';
@@ -27,6 +34,13 @@ class ChatModel {
     );
   }
 
+  String otherUserUid(String currentUserUid) {
+    return participantUids.firstWhere(
+      (uid) => uid != currentUserUid && uid != 'pending_invite',
+      orElse: () => '',
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -35,6 +49,7 @@ class ChatModel {
       'lastMessageText': lastMessageText,
       'lastMessageTimestamp': lastMessageTimestamp?.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'hiddenFor': hiddenFor,
     };
   }
 
@@ -50,6 +65,27 @@ class ChatModel {
       updatedAt: map['updatedAt'] != null
           ? DateTime.tryParse(map['updatedAt'] as String) ?? DateTime.now()
           : DateTime.now(),
+      hiddenFor: List<String>.from(map['hiddenFor'] as List? ?? []),
+    );
+  }
+
+  ChatModel copyWith({
+    String? id,
+    List<String>? participantUids,
+    List<String>? participantEmails,
+    String? lastMessageText,
+    DateTime? lastMessageTimestamp,
+    DateTime? updatedAt,
+    List<String>? hiddenFor,
+  }) {
+    return ChatModel(
+      id: id ?? this.id,
+      participantUids: participantUids ?? this.participantUids,
+      participantEmails: participantEmails ?? this.participantEmails,
+      lastMessageText: lastMessageText ?? this.lastMessageText,
+      lastMessageTimestamp: lastMessageTimestamp ?? this.lastMessageTimestamp,
+      updatedAt: updatedAt ?? this.updatedAt,
+      hiddenFor: hiddenFor ?? this.hiddenFor,
     );
   }
 }

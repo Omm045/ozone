@@ -1,12 +1,9 @@
-/// ICE Server Configuration Provider (v1: STUN-only)
+/// ICE Server Configuration Provider (STUN-only Direct P2P)
 ///
-/// Calls rely on STUN + direct peer-to-peer connectivity.
-/// Redundant Google STUN servers are configured in a centralized array.
-///
-/// EXTENSION POINT FOR TURN:
-/// To add TURN relay later (e.g. Cloudflare Calls, Twilio, Coturn),
-/// add your TURN configuration map to `turnServers` in `IceServerConfig`.
-/// No call-setup logic elsewhere needs to change.
+/// Calls rely on direct STUN peer-to-peer connectivity across local network
+/// and public internet routes using 5 redundant Google STUN endpoints.
+/// WebRTC gathers host (local network) and srflx (STUN public IP) candidates
+/// with iceTransportPolicy: 'all'.
 class IceServerConfig {
   static const List<String> defaultStunUrls = [
     'stun:stun.l.google.com:19302',
@@ -32,11 +29,14 @@ class IceServerConfig {
       iceServers.add({'urls': stunUrls});
     }
 
-    // 2. Add TURN servers (when configured in future)
-    iceServers.addAll(turnServers);
+    // 2. Add additional servers if provided via config
+    if (turnServers.isNotEmpty) {
+      iceServers.addAll(turnServers);
+    }
 
     return {
       'iceServers': iceServers,
+      'iceTransportPolicy': 'all',
       'sdpSemantics': 'unified-plan',
       'continualGatheringPolicy': 'gather_continually',
     };
@@ -44,16 +44,19 @@ class IceServerConfig {
 }
 
 abstract class IceConfigProvider {
-  Map<String, dynamic> getIceServers();
+  Future<Map<String, dynamic>> getIceServers({String? callId});
 }
 
 class DefaultIceConfigProvider implements IceConfigProvider {
   final IceServerConfig config;
 
-  const DefaultIceConfigProvider({this.config = const IceServerConfig()});
+  const DefaultIceConfigProvider({
+    this.config = const IceServerConfig(),
+  });
 
   @override
-  Map<String, dynamic> getIceServers() {
+  Future<Map<String, dynamic>> getIceServers({String? callId}) async {
+    // Builds ICE configuration with 5 redundant STUN endpoints; no external network call
     return config.toWebRtcConfig();
   }
 }

@@ -13,6 +13,7 @@ class ChatMessage {
   final String text;
   final DateTime timestamp;
   final MessageStatus status;
+  final bool isDeleted;
 
   const ChatMessage({
     required this.id,
@@ -22,6 +23,7 @@ class ChatMessage {
     required this.text,
     required this.timestamp,
     this.status = MessageStatus.sent,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -33,6 +35,7 @@ class ChatMessage {
       'text': text,
       'timestamp': timestamp.toIso8601String(),
       'status': status.name,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -50,18 +53,29 @@ class ChatMessage {
         (s) => s.name == (map['status'] as String? ?? 'sent'),
         orElse: () => MessageStatus.sent,
       ),
+      isDeleted: map['isDeleted'] as bool? ?? false,
     );
   }
 
-  ChatMessage copyWith({MessageStatus? status}) {
+  ChatMessage copyWith({
+    String? id,
+    String? chatId,
+    String? senderUid,
+    String? senderEmail,
+    String? text,
+    DateTime? timestamp,
+    MessageStatus? status,
+    bool? isDeleted,
+  }) {
     return ChatMessage(
-      id: id,
-      chatId: chatId,
-      senderUid: senderUid,
-      senderEmail: senderEmail,
-      text: text,
-      timestamp: timestamp,
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      senderUid: senderUid ?? this.senderUid,
+      senderEmail: senderEmail ?? this.senderEmail,
+      text: text ?? this.text,
+      timestamp: timestamp ?? this.timestamp,
       status: status ?? this.status,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

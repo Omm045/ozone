@@ -24,6 +24,54 @@ class ChatListScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _confirmDeleteChat(
+    BuildContext context,
+    ChatModel chat,
+    String currentUserUid,
+    String currentUserEmail,
+  ) async {
+    final otherEmail = chat.otherUserEmail(currentUserEmail);
+    final isInvite = chat.isPendingInvite;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: OzoneTheme.surfaceCard,
+          title: Text(
+            isInvite ? 'Delete Invite?' : 'Remove Conversation?',
+            style: const TextStyle(color: OzoneTheme.textPrimary, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            isInvite
+                ? 'Remove pending invite for $otherEmail? This invite entry will be deleted.'
+                : 'Remove chat with $otherEmail from your list? Message history will be retained for the other participant.',
+            style: const TextStyle(color: OzoneTheme.textSecondary, fontSize: 14, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              key: const Key('cancelDeleteChatBtn'),
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel', style: TextStyle(color: OzoneTheme.textSecondary)),
+            ),
+            TextButton(
+              key: const Key('confirmDeleteChatBtn'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                isInvite ? 'Delete' : 'Remove',
+                style: const TextStyle(color: OzoneTheme.ruby, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await chatRepository.removeChat(chatId: chat.id, userUid: currentUserUid);
+    }
+  }
+
   void _showConnectDialog(BuildContext context) {
     final auth = context.read<OzoneAuthProvider>();
     final currentUser = auth.currentUser;
@@ -77,6 +125,27 @@ class ChatListScreen extends StatelessWidget {
       body: StreamBuilder<List<ChatModel>>(
         stream: chatRepository.getChatsStream(currentUser.uid),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            debugPrint('[ChatListScreen] Error loading chats: ${snapshot.error}');
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: OzoneTheme.ruby, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load chats: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: OzoneTheme.ruby, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -150,49 +219,109 @@ class ChatListScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final chat = chats[index];
               final otherEmail = chat.otherUserEmail(currentUser.email);
-              final isInvite = chat.participantUids.contains('pending_invite');
+              final isInvite = chat.isPendingInvite;
 
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: OzoneTheme.surfaceCard,
-                  child: Text(
-                    otherEmail.isNotEmpty ? otherEmail[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: OzoneTheme.cyan,
-                      fontWeight: FontWeight.bold,
+              return GestureDetector(
+                onSecondaryTap: () => _confirmDeleteChat(
+                  context,
+                  chat,
+                  currentUser.uid,
+                  currentUser.email,
+                ),
+                child: ListTile(
+                  key: Key('chat_item_${chat.id}'),
+                  leading: CircleAvatar(
+                    backgroundColor: OzoneTheme.surfaceCard,
+                    child: Text(
+                      otherEmail.isNotEmpty ? otherEmail[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        color: isInvite ? OzoneTheme.amber : OzoneTheme.cyan,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                title: Text(
-                  otherEmail,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: OzoneTheme.textPrimary,
+                  title: Text(
+                    otherEmail,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: OzoneTheme.textPrimary,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  isInvite
-                      ? 'Invite pending (unregistered email)'
-                      : (chat.lastMessageText ?? 'Tap to chat or call'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isInvite
-                        ? OzoneTheme.amber
-                        : OzoneTheme.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                trailing: chat.lastMessageTimestamp != null
-                    ? Text(
-                        DateFormat.jm().format(chat.lastMessageTimestamp!),
-                        style: const TextStyle(
-                          color: OzoneTheme.textSecondary,
-                          fontSize: 12,
+                  subtitle: isInvite
+                      ? Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: OzoneTheme.amber.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: OzoneTheme.amber.withValues(alpha: 0.4),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: const Text(
+                                'INVITE PENDING',
+                                style: TextStyle(
+                                  color: OzoneTheme.amber,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Waiting for registration',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: OzoneTheme.textSecondary, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          chat.lastMessageText ?? 'Tap to chat or call',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: OzoneTheme.textSecondary,
+                            fontSize: 13,
+                          ),
                         ),
-                      )
-                    : null,
-                onTap: () => _openChat(context, chat),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (chat.lastMessageTimestamp != null && !isInvite)
+                        Text(
+                          DateFormat.jm().format(chat.lastMessageTimestamp!),
+                          style: const TextStyle(
+                            color: OzoneTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (isInvite)
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18, color: OzoneTheme.textSecondary),
+                          tooltip: 'Delete Invite',
+                          onPressed: () => _confirmDeleteChat(
+                            context,
+                            chat,
+                            currentUser.uid,
+                            currentUser.email,
+                          ),
+                        ),
+                    ],
+                  ),
+                  onTap: () => _openChat(context, chat),
+                  onLongPress: () => _confirmDeleteChat(
+                    context,
+                    chat,
+                    currentUser.uid,
+                    currentUser.email,
+                  ),
+                ),
               );
             },
           );

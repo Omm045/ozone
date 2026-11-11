@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ozone/core/webrtc/adaptive_quality_controller.dart';
+import 'package:ozone/core/webrtc/quality_preferences.dart';
 
 void main() {
   group('WebRTC Adaptive Quality Controller Tests', () {
@@ -187,6 +189,119 @@ void main() {
         packetLossPercent: 6.0,
       );
       expect(poor.signalStrength, 1);
+    });
+
+    test(
+      'Manual tier selection locks controller and ignores step up/down samples; switching back to Auto resumes adaptation',
+      () {
+        final controller = AdaptiveQualityController(
+          initialTier: ResolutionTier.p1080,
+          consecutiveGoodSamplesRequired: 2,
+        );
+
+        final tierEvents = <ResolutionTier>[];
+        controller.onTierChanged = (tier) => tierEvents.add(tier);
+
+        expect(controller.isAuto, isTrue);
+        expect(controller.currentTier, ResolutionTier.p1080);
+
+        // 1. Manually lock to 1080p
+        controller.setManualTier(ResolutionTier.p1080);
+        expect(controller.isAuto, isFalse);
+        expect(controller.manualTier, ResolutionTier.p1080);
+        expect(controller.currentTier, ResolutionTier.p1080);
+        expect(tierEvents, [ResolutionTier.p1080]);
+
+        // 2. Feed sustained 4K headroom (> 25 Mbps) — controller MUST ignore and remain locked at 1080p
+        const hugeHeadroom = NetworkStatsSample(
+          availableBandwidthBps: 30000000,
+          roundTripTimeMs: 20.0,
+          packetLossRate: 0.0,
+          currentFps: 30,
+        );
+
+        for (int i = 0; i < 5; i++) {
+          final action = controller.processSample(hugeHeadroom);
+          expect(action, isA<QualityStable>());
+          expect(controller.currentTier, ResolutionTier.p1080);
+        }
+        // No additional tier changes occurred
+        expect(tierEvents, [ResolutionTier.p1080]);
+
+        // 3. Feed severe degradation (6% loss, 350ms RTT) — controller MUST ignore and not step down
+        const degradedSample = NetworkStatsSample(
+          availableBandwidthBps: 500000,
+          roundTripTimeMs: 350.0,
+          packetLossRate: 0.06,
+          currentFps: 15,
+        );
+
+        for (int i = 0; i < 5; i++) {
+          final action = controller.processSample(degradedSample);
+          expect(action, isA<QualityStable>());
+          expect(controller.currentTier, ResolutionTier.p1080);
+        }
+
+        // 4. Switch manual tier to 4K
+        controller.setManualTier(ResolutionTier.p4k);
+        expect(controller.isAuto, isFalse);
+        expect(controller.currentTier, ResolutionTier.p4k);
+        expect(tierEvents, [ResolutionTier.p1080, ResolutionTier.p4k]);
+
+        // Feed degradation — stays locked at 4K
+        expect(controller.processSample(degradedSample), isA<QualityStable>());
+        expect(controller.currentTier, ResolutionTier.p4k);
+
+        // 5. Switch back to Auto
+        controller.setManualTier(null);
+        expect(controller.isAuto, isTrue);
+        expect(controller.manualTier, isNull);
+
+        // Now from the next sample onward, normal adaptive behavior resumes:
+        // Degradation causes step down from 4K to 1440p
+        final stepDownAction = controller.processSample(degradedSample);
+        expect(stepDownAction, isA<QualitySteppedDown>());
+        expect(controller.currentTier, ResolutionTier.p1440);
+        expect(tierEvents, [ResolutionTier.p1080, ResolutionTier.p4k, ResolutionTier.p1440]);
+      },
+    );
+
+    test('QualityIndicatorState reflects isAuto correctly', () {
+      final controller = AdaptiveQualityController(initialTier: ResolutionTier.p1080);
+
+      // Auto mode
+      final autoIndicator = controller.getCurrentIndicatorState();
+      expect(autoIndicator.isAuto, isTrue);
+      expect(autoIndicator.tier, ResolutionTier.p1080);
+
+      // Manual mode
+      controller.setManualTier(ResolutionTier.p1440);
+      final manualIndicator = controller.getCurrentIndicatorState();
+      expect(manualIndicator.isAuto, isFalse);
+      expect(manualIndicator.tier, ResolutionTier.p1440);
+    });
+
+    test('QualityPreferences persists preference across sessions', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      // Initial state is Auto (null)
+      final initial = await QualityPreferences.getSavedPreference();
+      expect(initial, isNull);
+
+      // Save fixed 1440p tier
+      await QualityPreferences.savePreference(ResolutionTier.p1440);
+      final saved1440 = await QualityPreferences.getSavedPreference();
+      expect(saved1440, ResolutionTier.p1440);
+
+      // Save fixed 4K tier
+      await QualityPreferences.savePreference(ResolutionTier.p4k);
+      final saved4k = await QualityPreferences.getSavedPreference();
+      expect(saved4k, ResolutionTier.p4k);
+
+      // Switch back to Auto
+      await QualityPreferences.savePreference(null);
+      final savedAuto = await QualityPreferences.getSavedPreference();
+      expect(savedAuto, isNull);
     });
   });
 }

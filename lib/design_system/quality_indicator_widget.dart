@@ -70,7 +70,7 @@ class QualityIndicatorWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              state.tier.name,
+              state.isAuto ? 'Auto · ${state.tier.name}' : state.tier.name,
               style: TextStyle(
                 color: color,
                 fontSize: 11,

@@ -32,5 +32,12 @@
 	<string>Ozone requires camera access for HD and 4K video calling.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ozone requires microphone access for audio and video calls.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Ozone uses your local network to connect calls directly to other devices for the best possible quality.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_webrtc._tcp</string>
+		<string>_webrtc._udp</string>
+	</array>
 </dict>
 </plist>

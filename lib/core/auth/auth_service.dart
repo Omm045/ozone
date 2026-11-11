@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_model.dart';
+import '../database/chat_repository.dart';
 
 abstract class AuthService {
   UserModel? get currentUser;
@@ -70,10 +72,16 @@ class FirebaseAuthService implements AuthService {
     );
 
     // Persist user record in Firestore under /users/{uid}
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .set(userModel.toMap(), SetOptions(merge: true));
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(userModel.toMap(), SetOptions(merge: true));
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[FirebaseAuthService] Warning: Failed to persist user profile in /users/${user.uid} during signUp: $e\n$stackTrace',
+      );
+    }
 
     // Send verification email
     await user.sendEmailVerification();
@@ -93,13 +101,28 @@ class FirebaseAuthService implements AuthService {
     );
 
     final user = credential.user!;
-    return UserModel(
+    final userModel = UserModel(
       uid: user.uid,
       email: normalizedEmail,
       displayName: user.displayName ?? normalizedEmail.split('@').first,
       isEmailVerified: user.emailVerified,
       createdAt: user.metadata.creationTime ?? DateTime.now(),
     );
+
+    // Self-healing: Ensure the Firestore profile document exists on every sign-in,
+    // even if it failed or was skipped at sign-up time (e.g. Firestore was unavailable).
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(userModel.toMap(), SetOptions(merge: true));
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[FirebaseAuthService] Warning: Failed to upsert user profile in /users/${user.uid} during signIn: $e\n$stackTrace',
+      );
+    }
+
+    return userModel;
   }
 
   @override
@@ -119,9 +142,15 @@ class FirebaseAuthService implements AuthService {
     final verified = updated?.emailVerified ?? false;
 
     if (verified) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'isEmailVerified': true,
-      });
+      try {
+        await _firestore.collection('users').doc(user.uid).set({
+          'isEmailVerified': true,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint(
+          '[FirebaseAuthService] Warning: Failed to update isEmailVerified in /users/${user.uid}: $e',
+        );
+      }
     }
 
     return verified;
@@ -137,8 +166,12 @@ class MockAuthService implements AuthService {
   UserModel? _currentUser;
   final Map<String, ({String password, UserModel user})> _users = {};
   bool _verificationSent = false;
+  final ChatRepository? chatRepository;
 
-  MockAuthService({UserModel? initialUser}) {
+  MockAuthService({
+    UserModel? initialUser,
+    this.chatRepository,
+  }) {
     if (initialUser != null) {
       _users[initialUser.email.toLowerCase().trim()] = (
         password: 'password123',
@@ -181,6 +214,10 @@ class MockAuthService implements AuthService {
     _users[normalized] = (password: password, user: user);
     _currentUser = user;
     _verificationSent = true;
+    final repo = chatRepository;
+    if (repo is MockChatRepository) {
+      repo.registerUser(user);
+    }
     return user;
   }
 
@@ -199,6 +236,10 @@ class MockAuthService implements AuthService {
     }
 
     _currentUser = entry.user;
+    final repo = chatRepository;
+    if (repo is MockChatRepository) {
+      repo.registerUser(entry.user);
+    }
     return entry.user;
   }
 

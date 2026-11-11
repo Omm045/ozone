@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 class OzoneTheme {
-  static const Color background = Color(0xFF0A0A0E);
-  static const Color surface = Color(0xFF14141C);
-  static const Color surfaceCard = Color(0xFF1C1C28);
+  static const Color background = Color(0xFF0D0E12);
+  static const Color surface = Color(0xFF13151C);
+  static const Color surfaceCard = Color(0xFF16181F);
   static const Color cyan = Color(0xFF00D2FF);
   static const Color emerald = Color(0xFF00E676);
   static const Color amber = Color(0xFFFFB300);
   static const Color ruby = Color(0xFFFF3366);
   static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFF9E9EAF);
+  static const Color textSecondary = Color(0xFF8E92A0);
 
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,

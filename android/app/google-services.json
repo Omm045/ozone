@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "552487283054",
+    "project_id": "ozone-fc7f5",
+    "storage_bucket": "ozone-fc7f5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:552487283054:android:09de0650f544446fc4b97f",
+        "android_client_info": {
+          "package_name": "com.ozone.app.ozone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMk_EpBceWGMMtInCtuA3V7OEJxPTFmaI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

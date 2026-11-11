@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/database/chat_repository.dart';
@@ -8,6 +9,7 @@ import 'design_system/ozone_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/auth/email_verification_screen.dart';
 import 'features/chats/chat_list_screen.dart';
+import 'features/call/incoming_call_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +19,9 @@ void main() async {
 
   try {
     // Attempt Firebase initialization (ozone-fc7f)
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
     authService = FirebaseAuthService();
     chatRepository = FirestoreChatRepository();
   } catch (e) {
@@ -41,15 +45,23 @@ void main() async {
 }
 
 class OzoneApp extends StatelessWidget {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   const OzoneApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Ozone',
       debugShowCheckedModeBanner: false,
       theme: OzoneTheme.darkTheme,
       home: const RootGate(),
+      builder: (context, child) {
+        return IncomingCallOverlayManager(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
