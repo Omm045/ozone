@@ -4,8 +4,8 @@ enum ResolutionTier {
     width: 1280,
     height: 720,
     targetFps: 30,
-    targetBitrateBps: 2000000,
-    minHeadroomForStepUpBps: 4000000,
+    targetBitrateBps: 2500000,
+    minHeadroomForStepUpBps: 4500000,
     scaleResolutionDownBy: 1.5,
   ),
   p1080(
@@ -31,7 +31,7 @@ enum ResolutionTier {
     width: 3840,
     height: 2160,
     targetFps: 30,
-    targetBitrateBps: 25000000, // 25 Mbps target taking advantage of high-bandwidth (up to 100 Mbps) connections
+    targetBitrateBps: 25000000,
     minHeadroomForStepUpBps: 999999999,
     scaleResolutionDownBy: 1.0,
   );
@@ -97,6 +97,36 @@ class NetworkStatsSample {
     required this.roundTripTimeMs,
     this.packetLossRate = 0.0,
     this.currentFps = 30,
+  });
+}
+
+class ConnectionTelemetry {
+  final int sendingBitrateKbps;
+  final int receivingBitrateKbps;
+  final String sentResolution;
+  final int sentFps;
+  final String receivedResolution;
+  final int receivedFps;
+  final int roundTripTimeMs;
+  final double packetLossPercent;
+  final int jitterMs;
+  final String routeType;
+  final String connectionState;
+  final String qualityStatus;
+
+  const ConnectionTelemetry({
+    this.sendingBitrateKbps = 5000,
+    this.receivingBitrateKbps = 5000,
+    this.sentResolution = '1920 x 1080',
+    this.sentFps = 30,
+    this.receivedResolution = '1920 x 1080',
+    this.receivedFps = 30,
+    this.roundTripTimeMs = 40,
+    this.packetLossPercent = 0.0,
+    this.jitterMs = 5,
+    this.routeType = 'Direct P2P',
+    this.connectionState = 'connected',
+    this.qualityStatus = 'Excellent',
   });
 }
 
@@ -173,6 +203,7 @@ class QualityIndicatorState {
   final double bandwidthMbps;
   final double packetLossPercent;
   final bool isAuto;
+  final ConnectionTelemetry telemetry;
 
   const QualityIndicatorState({
     this.tier = ResolutionTier.p1080,
@@ -181,6 +212,7 @@ class QualityIndicatorState {
     this.bandwidthMbps = 5.0,
     this.packetLossPercent = 0.0,
     this.isAuto = true,
+    this.telemetry = const ConnectionTelemetry(),
   });
 
   int get signalStrength {
@@ -189,10 +221,21 @@ class QualityIndicatorState {
     } else if (rttMs > 120 || packetLossPercent > 2.0) {
       return 2; // Fair
     } else if (tier >= ResolutionTier.p1440) {
-      return 4; // Excellent (HD/4K)
+      return 4; // Excellent
     } else {
       return 3; // Good
     }
+  }
+
+  String get qualityStatusString {
+    if (signalStrength == 1) return 'Poor';
+    if (signalStrength == 2) return 'Fair';
+    if (signalStrength == 3) {
+      return (tier >= ResolutionTier.p1080 && rttMs < 100 && packetLossPercent < 1.0)
+          ? 'Excellent'
+          : 'Good';
+    }
+    return 'Excellent';
   }
 }
 
@@ -262,7 +305,7 @@ class AdaptiveQualityController {
     final higher = _currentTier.nextHigher;
     if (higher == null) {
       _consecutiveGoodSamples = 0;
-      return const QualityStable(); // At 4K
+      return const QualityStable(); // At highest tier
     }
 
     if (_hasHeadroom(sample)) {
@@ -286,12 +329,28 @@ class AdaptiveQualityController {
     }
   }
 
-  QualityIndicatorState getCurrentIndicatorState() {
+  QualityIndicatorState getCurrentIndicatorState({ConnectionTelemetry? telemetry}) {
     final sample = _lastSample ??
         NetworkStatsSample(
           availableBandwidthBps: _currentTier.targetBitrateBps.toDouble(),
           roundTripTimeMs: 40.0,
           currentFps: currentTargetFps,
+        );
+
+    final resolvedTelemetry = telemetry ??
+        ConnectionTelemetry(
+          sendingBitrateKbps: (sample.availableBandwidthBps / 1000.0).round(),
+          receivingBitrateKbps: (sample.availableBandwidthBps / 1000.0).round(),
+          sentResolution: '${_currentTier.width} x ${_currentTier.height}',
+          sentFps: sample.currentFps > 0 ? sample.currentFps : currentTargetFps,
+          receivedResolution: '${_currentTier.width} x ${_currentTier.height}',
+          receivedFps: sample.currentFps > 0 ? sample.currentFps : currentTargetFps,
+          roundTripTimeMs: sample.roundTripTimeMs.round(),
+          packetLossPercent: sample.packetLossRate * 100.0,
+          jitterMs: 5,
+          routeType: 'Direct P2P',
+          connectionState: 'connected',
+          qualityStatus: _currentTier >= ResolutionTier.p1080 ? 'Excellent' : 'Good',
         );
 
     return QualityIndicatorState(
@@ -301,6 +360,7 @@ class AdaptiveQualityController {
       bandwidthMbps: sample.availableBandwidthBps / 1000000.0,
       packetLossPercent: sample.packetLossRate * 100.0,
       isAuto: isAuto,
+      telemetry: resolvedTelemetry,
     );
   }
 

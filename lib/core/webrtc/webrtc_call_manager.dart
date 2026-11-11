@@ -9,6 +9,7 @@ import 'ice_config_provider.dart';
 import 'adaptive_quality_controller.dart';
 import 'camera_constraint_selector.dart';
 import 'quality_preferences.dart';
+import 'sdp_utils.dart';
 
 class WebRtcCallManager extends ChangeNotifier {
   final FirebaseFirestore? _customFirestore;
@@ -18,6 +19,7 @@ class WebRtcCallManager extends ChangeNotifier {
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
+  MediaStream? _screenStream;
   RTCRtpSender? _videoSender;
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
@@ -27,13 +29,15 @@ class WebRtcCallManager extends ChangeNotifier {
   CallStatus _status = CallStatus.connecting;
   String? _failureReason;
   QualityIndicatorState _qualityState = const QualityIndicatorState();
+  ConnectionTelemetry _latestTelemetry = const ConnectionTelemetry();
 
   bool _isCaller = false;
-  bool _hasRemoteDescription = false;
+  bool _isRemoteDescriptionSet = false;
+  final List<RTCIceCandidate> _remoteCandidateQueue = [];
+
   bool _hasGatheredHostCandidate = false;
   bool _isLocalNetworkDenied = false;
   final Set<String> _gatheredCandidateTypes = {};
-  final List<RTCIceCandidate> _pendingRemoteCandidates = [];
   final List<String> _sessionLogs = [];
   String? _connectedPair;
 
@@ -41,6 +45,7 @@ class WebRtcCallManager extends ChangeNotifier {
   bool _isVideoDisabled = false;
   bool _isFrontCamera = true;
   bool _isSpeakerphoneOn = false;
+  bool _isScreenSharing = false;
 
   Timer? _statsTimer;
   Timer? _connectionTimeoutTimer;
@@ -51,8 +56,10 @@ class WebRtcCallManager extends ChangeNotifier {
   StreamSubscription? _candidatesSubscription;
 
   int _previousBytesSent = 0;
+  int _previousBytesReceived = 0;
   double _previousTimestamp = 0;
   int _statsCounter = 0;
+  ResolutionTier? _lastAppliedTier;
 
   WebRtcCallManager({
     FirebaseFirestore? firestore,
@@ -69,15 +76,19 @@ class WebRtcCallManager extends ChangeNotifier {
   CallStatus get status => _status;
   String? get failureReason => _failureReason;
   QualityIndicatorState get qualityState => _qualityState;
+  ConnectionTelemetry get latestTelemetry => _latestTelemetry;
   CallSession? get currentSession => _currentSession;
   bool get isMuted => _isMuted;
   bool get isVideoDisabled => _isVideoDisabled;
   bool get isSpeakerphoneOn => _isSpeakerphoneOn;
+  bool get isScreenSharing => _isScreenSharing;
   bool get isAudioOnly => _currentSession?.isAudioOnly ?? false;
   bool get isLocalNetworkDenied => _isLocalNetworkDenied;
   bool get hasGatheredHostCandidate => _hasGatheredHostCandidate;
   bool get isCaller => _isCaller;
-  bool get hasRemoteDescription => _hasRemoteDescription;
+  bool get isRemoteDescriptionSet => _isRemoteDescriptionSet;
+  bool get hasRemoteDescription => _isRemoteDescriptionSet;
+  List<RTCIceCandidate> get remoteCandidateQueue => List.unmodifiable(_remoteCandidateQueue);
   Set<String> get gatheredCandidateTypes => Set.unmodifiable(_gatheredCandidateTypes);
   List<String> get sessionLogs => List.unmodifiable(_sessionLogs);
   String? get connectedPair => _connectedPair;
@@ -113,7 +124,7 @@ class WebRtcCallManager extends ChangeNotifier {
     if (savedTier != null) {
       _applyEncodingParameters(savedTier);
     }
-    _qualityState = qualityController.getCurrentIndicatorState();
+    _qualityState = qualityController.getCurrentIndicatorState(telemetry: _latestTelemetry);
     notifyListeners();
   }
 
@@ -125,7 +136,7 @@ class WebRtcCallManager extends ChangeNotifier {
     } else {
       _applyEncodingParameters(qualityController.currentTier);
     }
-    _qualityState = qualityController.getCurrentIndicatorState();
+    _qualityState = qualityController.getCurrentIndicatorState(telemetry: _latestTelemetry);
     notifyListeners();
   }
 
@@ -151,9 +162,6 @@ class WebRtcCallManager extends ChangeNotifier {
     }
   }
 
-  /// Deterministic tie-breaker for simultaneous call glare (when both users call each other).
-  /// If myUid > peerUid, my call takes precedence (do not yield).
-  /// If myUid < peerUid, peer call takes precedence (yield outgoing, accept incoming).
   static bool shouldYieldGlare({required String myUid, required String peerUid}) {
     return myUid.compareTo(peerUid) > 0;
   }
@@ -163,7 +171,6 @@ class WebRtcCallManager extends ChangeNotifier {
     required UserModel callee,
     CallType callType = CallType.video,
   }) async {
-    // Teardown any lingering prior session before initiating new call
     if (_currentSession != null) {
       _endCallInternal(status: CallStatus.ended);
     }
@@ -174,10 +181,13 @@ class WebRtcCallManager extends ChangeNotifier {
     _hasGatheredHostCandidate = false;
     _isLocalNetworkDenied = false;
     _gatheredCandidateTypes.clear();
-    _pendingRemoteCandidates.clear();
-    _hasRemoteDescription = false;
+    _remoteCandidateQueue.clear();
+    _isRemoteDescriptionSet = false;
     _sessionLogs.clear();
     _connectedPair = null;
+    _lastAppliedTier = null;
+    _isScreenSharing = false;
+
     _log('Starting outgoing ${callType.name} call to ${callee.email}');
     notifyListeners();
 
@@ -205,16 +215,19 @@ class WebRtcCallManager extends ChangeNotifier {
       'offerToReceiveAudio': 1,
       'offerToReceiveVideo': callType == CallType.audio ? 0 : 1,
     });
-    await _peerConnection!.setLocalDescription(offer);
+
+    // Munge SDP to prioritize VP8 and Baseline H.264 for cross-platform stability
+    final mungedOfferSdp = SdpUtils.preferCompatibleVideoCodecs(offer.sdp ?? '');
+    final mungedOffer = RTCSessionDescription(mungedOfferSdp, offer.type);
+    await _peerConnection!.setLocalDescription(mungedOffer);
 
     // Save Call Doc with Offer in Firestore
     await callDoc.set({
       ..._currentSession!.toMap(),
-      'offer': {'sdp': offer.sdp, 'type': offer.type},
+      'offer': {'sdp': mungedOffer.sdp, 'type': mungedOffer.type},
     });
-    _log('Created offer and stored in Firestore call doc ${callDoc.id}');
+    _log('Created offer (VP8/Baseline preferred) and stored in Firestore call doc ${callDoc.id}');
 
-    // Start ringing timeout waiting for callee to answer
     _startRingingTimeoutTimer();
 
     // Listen for Answer
@@ -236,22 +249,22 @@ class WebRtcCallManager extends ChangeNotifier {
 
       if (_peerConnection != null &&
           session.answer != null &&
-          !_hasRemoteDescription &&
+          !_isRemoteDescriptionSet &&
           _status != CallStatus.connected) {
         _log('Received answer from callee.');
         try {
+          final mungedAnswerSdp = SdpUtils.preferCompatibleVideoCodecs(session.answer!['sdp'] as String);
           final answer = RTCSessionDescription(
-            session.answer!['sdp'] as String,
+            mungedAnswerSdp,
             session.answer!['type'] as String,
           );
           await _peerConnection!.setRemoteDescription(answer);
-          _hasRemoteDescription = true;
+          _isRemoteDescriptionSet = true;
           _status = CallStatus.connecting;
-          _log('Set remote description from answer; starting negotiation timeout timer.');
+          _log('Set remote description from answer; flushing queued candidates.');
           notifyListeners();
-          // Callee answered: cancel ringing timer and start 15s negotiation timer
           _startConnectionTimeoutTimer(reason: 'ICE negotiation after answer');
-          await _drainPendingCandidates();
+          await _flushRemoteCandidateQueue();
         } catch (e) {
           _log('Error setting remote description from answer: $e');
           _onConnectionFailed(reason: 'Failed to negotiate connection: $e');
@@ -264,7 +277,6 @@ class WebRtcCallManager extends ChangeNotifier {
   }
 
   Future<void> acceptIncomingCall({required CallSession session}) async {
-    // Teardown any lingering prior session before accepting new call
     if (_currentSession != null && _currentSession!.id != session.id) {
       _endCallInternal(status: CallStatus.ended);
     }
@@ -276,10 +288,13 @@ class WebRtcCallManager extends ChangeNotifier {
     _hasGatheredHostCandidate = false;
     _isLocalNetworkDenied = false;
     _gatheredCandidateTypes.clear();
-    _pendingRemoteCandidates.clear();
-    _hasRemoteDescription = false;
+    _remoteCandidateQueue.clear();
+    _isRemoteDescriptionSet = false;
     _sessionLogs.clear();
     _connectedPair = null;
+    _lastAppliedTier = null;
+    _isScreenSharing = false;
+
     _log('Accepting incoming ${session.isAudioOnly ? "audio" : "video"} call ${session.id} from ${session.callerEmail}');
     notifyListeners();
 
@@ -295,14 +310,15 @@ class WebRtcCallManager extends ChangeNotifier {
     // Set Remote Description from Offer
     if (session.offer != null) {
       try {
+        final mungedOfferSdp = SdpUtils.preferCompatibleVideoCodecs(session.offer!['sdp'] as String);
         final offer = RTCSessionDescription(
-          session.offer!['sdp'] as String,
+          mungedOfferSdp,
           session.offer!['type'] as String,
         );
         await _peerConnection!.setRemoteDescription(offer);
-        _hasRemoteDescription = true;
-        _log('Set remote description from offer.');
-        await _drainPendingCandidates();
+        _isRemoteDescriptionSet = true;
+        _log('Set remote description from offer; flushing queued candidates.');
+        await _flushRemoteCandidateQueue();
       } catch (e) {
         _log('Error setting remote description from offer: $e');
         _onConnectionFailed(reason: 'Failed to negotiate connection: $e');
@@ -315,17 +331,20 @@ class WebRtcCallManager extends ChangeNotifier {
       'offerToReceiveAudio': 1,
       'offerToReceiveVideo': session.isAudioOnly ? 0 : 1,
     });
-    await _peerConnection!.setLocalDescription(answer);
+
+    // Munge SDP to prioritize VP8 and Baseline H.264
+    final mungedAnswerSdp = SdpUtils.preferCompatibleVideoCodecs(answer.sdp ?? '');
+    final mungedAnswer = RTCSessionDescription(mungedAnswerSdp, answer.type);
+    await _peerConnection!.setLocalDescription(mungedAnswer);
 
     // Update Call Doc in Firestore
     await callDoc.update({
       'status': CallStatus.connecting.name,
-      'answer': {'sdp': answer.sdp, 'type': answer.type},
+      'answer': {'sdp': mungedAnswer.sdp, 'type': mungedAnswer.type},
     });
 
     _startConnectionTimeoutTimer(reason: 'callee ICE negotiation');
 
-    // Listen for caller terminating call while connecting
     _callDocSubscription = callDoc.snapshots().listen((snapshot) {
       final data = snapshot.data();
       if (data == null) return;
@@ -363,27 +382,25 @@ class WebRtcCallManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _drainPendingCandidates() async {
-    if (_peerConnection == null || _pendingRemoteCandidates.isEmpty) return;
-    _log('Draining ${_pendingRemoteCandidates.length} buffered remote candidates...');
-    final candidatesToDrain = List<RTCIceCandidate>.from(_pendingRemoteCandidates);
-    _pendingRemoteCandidates.clear();
-    for (final candidate in candidatesToDrain) {
+  Future<void> _flushRemoteCandidateQueue() async {
+    if (_peerConnection == null || _remoteCandidateQueue.isEmpty) return;
+    _log('Flushing ${_remoteCandidateQueue.length} queued remote candidates...');
+    final candidatesToFlush = List<RTCIceCandidate>.from(_remoteCandidateQueue);
+    _remoteCandidateQueue.clear();
+    for (final candidate in candidatesToFlush) {
       try {
         final cType = extractCandidateType(candidate.candidate);
         await _peerConnection!.addCandidate(candidate);
-        _log('Applied buffered remote candidate: [type=$cType]');
+        _log('Applied queued remote candidate: [type=$cType]');
       } catch (e) {
-        _log('Error applying buffered candidate: $e');
+        _log('Error applying queued candidate: $e');
       }
     }
   }
 
   Future<void> _setupMediaAndPeerConnection({bool isAudioOnly = false}) async {
-    // 0. Probe local network to trigger iOS/macOS Local Network permission prompt if needed
     await _probeLocalNetwork();
 
-    // Enumerate audio devices and log for diagnostic visibility (e.g. Mac mic device checks)
     try {
       final devices = await navigator.mediaDevices.enumerateDevices();
       final audioInputs = devices.where((d) => d.kind == 'audioinput').toList();
@@ -395,12 +412,12 @@ class WebRtcCallManager extends ChangeNotifier {
       _log('Device enumeration note: $e');
     }
 
-    // 1. Get User Media starting at 1080p baseline or audio-only
+    // 1. Get User Media with safe resolution constraints capped at 1080p 30fps
     final mediaConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
       qualityController.currentTier,
       isFrontCamera: _isFrontCamera,
       isAudioOnly: isAudioOnly,
-      maxFps: qualityController.currentTargetFps,
+      maxFps: 30,
     );
 
     _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
@@ -411,7 +428,6 @@ class WebRtcCallManager extends ChangeNotifier {
     final audioTracks = _localStream!.getAudioTracks();
     final videoTracks = _localStream!.getVideoTracks();
 
-    // Ensure audio tracks are unmuted and gain is full level (fixes macOS hardware attenuation)
     try {
       await Helper.setMicrophoneMuted(false);
     } catch (_) {}
@@ -423,33 +439,22 @@ class WebRtcCallManager extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // Detect 60fps support if camera supports it
-    if (videoTracks.isNotEmpty) {
-      try {
-        final settings = videoTracks.first.getSettings();
-        final reportedFps = settings['frameRate'];
-        if (reportedFps is num && reportedFps >= 50) {
-          qualityController.deviceSupports60Fps = true;
-          _log('Camera supports high framerate capture (${reportedFps}fps). 60fps enabled for high tiers.');
-        }
-      } catch (_) {}
-    }
-
     _log(
-      'Acquired local stream: ${audioTracks.length} audio track(s) (enabled: ${audioTracks.map((t) => t.enabled).toList()}), '
-      '${videoTracks.length} video track(s) (enabled: ${videoTracks.map((t) => t.enabled).toList()})',
+      'Acquired local stream: ${audioTracks.length} audio track(s), '
+      '${videoTracks.length} video track(s)',
     );
 
-    // 2. Build PeerConnection with STUN-only iceServers
+    // 2. Build PeerConnection with Unified Plan enforced
     final rtcConfig = await _iceConfigProvider.getIceServers(callId: _currentSession?.id);
+    rtcConfig['sdpSemantics'] = 'unified-plan';
     final iceServersCount = (rtcConfig['iceServers'] as List?)?.length ?? 0;
-    _log('Configuring RTCPeerConnection with $iceServersCount ICE server group(s).');
+    _log('Configuring RTCPeerConnection (Unified Plan) with $iceServersCount ICE server group(s).');
     _peerConnection = await createPeerConnection(rtcConfig);
 
     // 3. Add tracks to PeerConnection
     for (final track in _localStream!.getTracks()) {
       final sender = await _peerConnection!.addTrack(track, _localStream!);
-      _log('Added track to RTCPeerConnection: id=${track.id}, kind=${track.kind}, enabled=${track.enabled}');
+      _log('Added track to RTCPeerConnection: id=${track.id}, kind=${track.kind}');
       if (track.kind == 'video') {
         _videoSender = sender;
         _applyEncodingParameters(qualityController.currentTier);
@@ -501,7 +506,7 @@ class WebRtcCallManager extends ChangeNotifier {
       }());
     };
 
-    // 6. Handle Connection State
+    // 6. Handle Connection States
     _peerConnection!.onIceConnectionState = (state) {
       _log('ICE Connection State changed: $state');
       if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
@@ -544,7 +549,6 @@ class WebRtcCallManager extends ChangeNotifier {
         if (change.type == DocumentChangeType.added) {
           final data = change.doc.data();
           if (data != null && _peerConnection != null) {
-            // Guard against stale candidates from mismatched or previously ended calls
             if (_currentSession == null || _currentSession!.id != callId) {
               _log('Ignoring stale ICE candidate from call $callId (active: ${_currentSession?.id})');
               continue;
@@ -558,9 +562,9 @@ class WebRtcCallManager extends ChangeNotifier {
               data['sdpMLineIndex'] as int?,
             );
 
-            if (!_hasRemoteDescription) {
-              _pendingRemoteCandidates.add(candidate);
-              _log('Buffered remote ICE candidate before remote description: [type=$candidateType] $candStr');
+            if (!_isRemoteDescriptionSet) {
+              _remoteCandidateQueue.add(candidate);
+              _log('Queued remote ICE candidate before remote description: [type=$candidateType] $candStr');
             } else {
               try {
                 await _peerConnection!.addCandidate(candidate);
@@ -703,7 +707,8 @@ class WebRtcCallManager extends ChangeNotifier {
 
   void _startStatsPolling() {
     _statsTimer?.cancel();
-    _statsTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+    // Non-blocking timer polling RTCPeerConnection.getStats() every 2 seconds
+    _statsTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
       await _measureStats();
     });
   }
@@ -713,90 +718,301 @@ class WebRtcCallManager extends ChangeNotifier {
 
     try {
       final reports = await _peerConnection!.getStats();
-      double availableBandwidth = qualityController.currentTier.targetBitrateBps.toDouble();
-      double rtt = 45.0;
-      double packetLoss = 0.0;
-      int fps = 30;
+      final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
+      final dt = (_previousTimestamp > 0 && now > _previousTimestamp) ? now - _previousTimestamp : 2.0;
 
-      _statsCounter++;
-      dynamic outboundAudioLevel;
-      dynamic inboundAudioLevel;
+      int currentBytesSent = _previousBytesSent;
+      int currentBytesReceived = _previousBytesReceived;
+      int sendingKbps = 0;
+      int receivingKbps = 0;
+
+      int sentWidth = 0;
+      int sentHeight = 0;
+      int sentFps = 30;
+
+      int recvWidth = 0;
+      int recvHeight = 0;
+      int recvFps = 30;
+
+      double rttMs = 40.0;
+      double packetLossPercent = 0.0;
+      double jitterSeconds = 0.005;
+      String routeType = 'Direct P2P';
 
       for (final report in reports) {
         final values = report.values;
-        if ((report.type == 'media-source' || report.type == 'outbound-rtp') &&
-            values['kind'] == 'audio') {
-          outboundAudioLevel ??= values['audioLevel'] ?? values['totalAudioEnergy'];
-        } else if (report.type == 'inbound-rtp' && values['kind'] == 'audio') {
-          inboundAudioLevel ??= values['audioLevel'] ?? values['totalAudioEnergy'];
-        }
 
         if (report.type == 'outbound-rtp' && values['kind'] == 'video') {
-          final bytes = int.tryParse(values['bytesSent']?.toString() ?? '0') ?? 0;
-          final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
-          if (_previousTimestamp > 0 && now > _previousTimestamp && bytes >= _previousBytesSent) {
-            final diffBytes = bytes - _previousBytesSent;
-            final diffTime = now - _previousTimestamp;
-            availableBandwidth = (diffBytes * 8.0) / diffTime;
+          final bytes = int.tryParse(values['bytesSent']?.toString() ?? '') ?? currentBytesSent;
+          if (bytes >= _previousBytesSent && _previousTimestamp > 0) {
+            sendingKbps = (((bytes - _previousBytesSent) * 8) / (dt * 1000)).round();
           }
-          _previousBytesSent = bytes;
-          _previousTimestamp = now;
+          currentBytesSent = bytes;
 
-          final statFps = int.tryParse(values['framesPerSecond']?.toString() ?? '0');
-          if (statFps != null && statFps > 0) fps = statFps;
-        } else if (report.type == 'remote-inbound-rtp') {
-          final roundTrip = double.tryParse(values['roundTripTime']?.toString() ?? '0');
-          if (roundTrip != null && roundTrip > 0) rtt = roundTrip * 1000.0;
-          final lostFrac = double.tryParse(values['fractionLost']?.toString() ?? '0');
-          if (lostFrac != null) packetLoss = lostFrac;
-        } else if (report.type == 'candidate-pair' && values['state'] == 'succeeded') {
-          final curRtt = double.tryParse(values['currentRoundTripTime']?.toString() ?? '0');
-          if (curRtt != null && curRtt > 0) rtt = curRtt * 1000.0;
-          final bitrate = double.tryParse(values['availableOutgoingBitrate']?.toString() ?? '0');
-          if (bitrate != null && bitrate > 0) availableBandwidth = bitrate;
+          final statFps = int.tryParse(values['framesPerSecond']?.toString() ?? '');
+          if (statFps != null && statFps > 0) sentFps = statFps;
+
+          final w = int.tryParse(values['frameWidth']?.toString() ?? '');
+          final h = int.tryParse(values['frameHeight']?.toString() ?? '');
+          if (w != null && w > 0) sentWidth = w;
+          if (h != null && h > 0) sentHeight = h;
+        } else if (report.type == 'inbound-rtp' && values['kind'] == 'video') {
+          final bytes = int.tryParse(values['bytesReceived']?.toString() ?? '') ?? currentBytesReceived;
+          if (bytes >= _previousBytesReceived && _previousTimestamp > 0) {
+            receivingKbps = (((bytes - _previousBytesReceived) * 8) / (dt * 1000)).round();
+          }
+          currentBytesReceived = bytes;
+
+          final statFps = int.tryParse(values['framesPerSecond']?.toString() ?? '');
+          if (statFps != null && statFps > 0) recvFps = statFps;
+
+          final w = int.tryParse(values['frameWidth']?.toString() ?? '');
+          final h = int.tryParse(values['frameHeight']?.toString() ?? '');
+          if (w != null && w > 0) recvWidth = w;
+          if (h != null && h > 0) recvHeight = h;
+
+          final lost = int.tryParse(values['packetsLost']?.toString() ?? '');
+          final received = int.tryParse(values['packetsReceived']?.toString() ?? '');
+          if (lost != null && received != null && (lost + received) > 0) {
+            packetLossPercent = (lost / (lost + received)) * 100.0;
+          }
+
+          final j = double.tryParse(values['jitter']?.toString() ?? '');
+          if (j != null && j >= 0) jitterSeconds = j;
+        } else if (report.type == 'candidate-pair' &&
+            (values['state'] == 'succeeded' || values['nominated'] == true)) {
+          final curRtt = double.tryParse(values['currentRoundTripTime']?.toString() ?? '');
+          if (curRtt != null && curRtt > 0) {
+            rttMs = curRtt * 1000.0;
+          } else {
+            final altRtt = double.tryParse(values['roundTripTime']?.toString() ?? '');
+            if (altRtt != null && altRtt > 0) rttMs = altRtt * 1000.0;
+          }
+
+          final localType = (values['localCandidateType'] ?? '').toString().toLowerCase();
+          final remoteType = (values['remoteCandidateType'] ?? '').toString().toLowerCase();
+          if (localType == 'relay' || remoteType == 'relay') {
+            routeType = 'Through a relay server';
+          } else {
+            routeType = 'Direct P2P';
+          }
         }
       }
 
-      if (_isDisposed || _status != CallStatus.connected) return;
+      _previousBytesSent = currentBytesSent;
+      _previousBytesReceived = currentBytesReceived;
+      _previousTimestamp = now;
 
-      if (_statsCounter % 5 == 0 &&
-          (outboundAudioLevel != null || inboundAudioLevel != null)) {
-        _log('Audio Stats: outboundLevel=$outboundAudioLevel, inboundLevel=$inboundAudioLevel');
+      // Ensure stable display defaults during stream warm-up
+      if (sendingKbps <= 0) {
+        sendingKbps = (qualityController.currentTier.targetBitrateBps / 1000).round();
+      }
+      if (receivingKbps <= 0) {
+        receivingKbps = (qualityController.currentTier.targetBitrateBps / 1000).round();
+      }
+      if (sentWidth == 0 || sentHeight == 0) {
+        sentWidth = qualityController.currentTier.width;
+        sentHeight = qualityController.currentTier.height;
+      }
+      if (recvWidth == 0 || recvHeight == 0) {
+        recvWidth = qualityController.currentTier.width;
+        recvHeight = qualityController.currentTier.height;
       }
 
+      final connState = _peerConnection?.connectionState?.name ?? 'connected';
+
       final sample = NetworkStatsSample(
-        availableBandwidthBps: availableBandwidth,
-        roundTripTimeMs: rtt,
-        packetLossRate: packetLoss,
-        currentFps: fps,
+        availableBandwidthBps: sendingKbps * 1000.0,
+        roundTripTimeMs: rttMs,
+        packetLossRate: packetLossPercent / 100.0,
+        currentFps: sentFps,
       );
 
       qualityController.processSample(sample);
-      _qualityState = qualityController.getCurrentIndicatorState();
+      final indicator = qualityController.getCurrentIndicatorState();
+
+      _latestTelemetry = ConnectionTelemetry(
+        sendingBitrateKbps: sendingKbps,
+        receivingBitrateKbps: receivingKbps,
+        sentResolution: '$sentWidth x $sentHeight',
+        sentFps: sentFps,
+        receivedResolution: '$recvWidth x $recvHeight',
+        receivedFps: recvFps,
+        roundTripTimeMs: rttMs.round(),
+        packetLossPercent: double.parse(packetLossPercent.toStringAsFixed(1)),
+        jitterMs: (jitterSeconds * 1000.0).round(),
+        routeType: routeType,
+        connectionState: connState,
+        qualityStatus: indicator.qualityStatusString,
+      );
+
+      _qualityState = QualityIndicatorState(
+        tier: qualityController.currentTier,
+        fps: sentFps,
+        rttMs: rttMs,
+        bandwidthMbps: sendingKbps / 1000.0,
+        packetLossPercent: packetLossPercent,
+        isAuto: qualityController.isAuto,
+        telemetry: _latestTelemetry,
+      );
+
+      _statsCounter++;
+      if (_statsCounter % 3 == 0) {
+        _log(
+          'WebRTC Telemetry: sending=${sendingKbps}kbps, receiving=${receivingKbps}kbps, '
+          'res=$sentWidth x $sentHeight @ ${sentFps}fps, rtt=${rttMs.round()}ms, route=$routeType',
+        );
+      }
+
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      _log('Stats collection note: $e');
+    }
   }
 
   void _onResolutionTierChanged(ResolutionTier newTier) {
     _applyEncodingParameters(newTier);
-    _qualityState = qualityController.getCurrentIndicatorState();
+    _qualityState = qualityController.getCurrentIndicatorState(telemetry: _latestTelemetry);
     notifyListeners();
   }
 
   void _applyEncodingParameters(ResolutionTier tier) {
     if (_videoSender == null) return;
+    // Only call setParameters when quality tier actually changes to avoid video stuttering
+    if (_lastAppliedTier == tier) return;
+
     try {
       final parameters = _videoSender!.parameters;
       final encodings = parameters.encodings;
       if (encodings != null && encodings.isNotEmpty) {
+        final int maxBitrate;
+        switch (tier) {
+          case ResolutionTier.p4k:
+          case ResolutionTier.p1440:
+          case ResolutionTier.p1080:
+            maxBitrate = 5000000; // Excellent: up to 5000000 bps
+            break;
+          case ResolutionTier.p720:
+            maxBitrate = 2500000; // Good: 2500000 bps
+            break;
+        }
+
         for (final encoding in encodings) {
-          encoding.maxBitrate = tier.targetBitrateBps;
-          encoding.maxFramerate = qualityController.currentTargetFps;
+          encoding.maxBitrate = maxBitrate;
+          encoding.maxFramerate = 30;
           encoding.scaleResolutionDownBy = tier.scaleResolutionDownBy;
         }
         _videoSender!.setParameters(parameters);
+        _lastAppliedTier = tier;
+        _log('Applied RTCRtpSender encoding parameters for $tier: maxBitrate=$maxBitrate bps, maxFramerate=30');
       }
-    } catch (_) {}
+    } catch (e) {
+      _log('Note: Error applying encoding parameters: $e');
+    }
+  }
+
+  // --- Screen Sharing via RTCRtpSender.replaceTrack ---
+
+  Future<void> startScreenShare() async {
+    if (_isScreenSharing || _peerConnection == null) return;
+
+    try {
+      _log('Starting screen sharing via getDisplayMedia...');
+      final mediaConstraints = <String, dynamic>{
+        'audio': false,
+        'video': {
+          'mandatory': {
+            'minWidth': '1280',
+            'minHeight': '720',
+            'maxWidth': '1920',
+            'maxHeight': '1080',
+            'maxFrameRate': '30',
+          },
+        },
+      };
+
+      _screenStream = await navigator.mediaDevices.getDisplayMedia(mediaConstraints);
+      final screenVideoTrack = _screenStream?.getVideoTracks().firstOrNull;
+      if (screenVideoTrack == null) {
+        _log('No video track obtained from getDisplayMedia');
+        return;
+      }
+
+      screenVideoTrack.onEnded = () {
+        _log('Screen share track ended by OS');
+        stopScreenShare();
+      };
+
+      // Locate existing video sender without recreating PeerConnection
+      final senders = await _peerConnection!.getSenders();
+      RTCRtpSender? videoSender;
+      for (final s in senders) {
+        if (s == _videoSender || s.track?.kind == 'video') {
+          videoSender = s;
+          break;
+        }
+      }
+      videoSender ??= _videoSender;
+
+      if (videoSender != null) {
+        await videoSender.replaceTrack(screenVideoTrack);
+        _videoSender = videoSender;
+        _isScreenSharing = true;
+        _log('Seamlessly replaced video track with screen track via replaceTrack.');
+        notifyListeners();
+      } else {
+        _log('Warning: No video sender available to replaceTrack.');
+      }
+    } catch (e) {
+      _log('Failed to start screen share: $e');
+    }
+  }
+
+  Future<void> stopScreenShare() async {
+    if (!_isScreenSharing) return;
+
+    try {
+      _log('Stopping screen share and restoring camera track...');
+      _screenStream?.getTracks().forEach((t) {
+        try {
+          t.stop();
+        } catch (_) {}
+      });
+      await _screenStream?.dispose();
+      _screenStream = null;
+
+      final cameraVideoTrack = _localStream?.getVideoTracks().firstOrNull;
+
+      final senders = await _peerConnection?.getSenders() ?? [];
+      RTCRtpSender? videoSender;
+      for (final s in senders) {
+        if (s == _videoSender || s.track?.kind == 'video') {
+          videoSender = s;
+          break;
+        }
+      }
+      videoSender ??= _videoSender;
+
+      if (videoSender != null && cameraVideoTrack != null) {
+        await videoSender.replaceTrack(cameraVideoTrack);
+        _log('Restored camera track to video sender via replaceTrack.');
+      }
+
+      _isScreenSharing = false;
+      notifyListeners();
+    } catch (e) {
+      _log('Error stopping screen share: $e');
+      _isScreenSharing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleScreenShare() async {
+    if (_isScreenSharing) {
+      await stopScreenShare();
+    } else {
+      await startScreenShare();
+    }
   }
 
   void toggleMute() {
@@ -953,17 +1169,22 @@ class WebRtcCallManager extends ChangeNotifier {
     _callDocSubscription?.cancel();
     _candidatesSubscription?.cancel();
 
-    _pendingRemoteCandidates.clear();
-    _hasRemoteDescription = false;
+    _remoteCandidateQueue.clear();
+    _isRemoteDescriptionSet = false;
 
-    _localStream?.getTracks().forEach((t) => t.stop());
-    _localStream?.dispose();
-    _localStream = null;
+    // Stop and dispose screen share tracks cleanly
+    _screenStream?.getTracks().forEach((t) {
+      try {
+        t.stop();
+      } catch (_) {}
+    });
+    try {
+      _screenStream?.dispose();
+    } catch (_) {}
+    _screenStream = null;
+    _isScreenSharing = false;
 
-    _peerConnection?.close();
-    _peerConnection?.dispose();
-    _peerConnection = null;
-
+    // Clear renderers before closing tracks to prevent texture render exceptions
     try {
       if (localRenderer.srcObject != null) {
         localRenderer.srcObject = null;
@@ -974,6 +1195,25 @@ class WebRtcCallManager extends ChangeNotifier {
         remoteRenderer.srcObject = null;
       }
     } catch (_) {}
+
+    // Stop and dispose local media tracks cleanly
+    _localStream?.getTracks().forEach((t) {
+      try {
+        t.stop();
+      } catch (_) {}
+    });
+    try {
+      _localStream?.dispose();
+    } catch (_) {}
+    _localStream = null;
+
+    try {
+      _peerConnection?.close();
+      _peerConnection?.dispose();
+    } catch (_) {}
+    _peerConnection = null;
+    _videoSender = null;
+    _lastAppliedTier = null;
 
     _status = status;
     if (reason != null) {

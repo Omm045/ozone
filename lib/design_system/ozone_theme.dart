@@ -4,6 +4,7 @@ class OzoneTheme {
   static const Color background = Color(0xFF0D0E12);
   static const Color surface = Color(0xFF13151C);
   static const Color surfaceCard = Color(0xFF16181F);
+  static const Color statsCard = Color(0xFF1C1632);
   static const Color cyan = Color(0xFF00D2FF);
   static const Color emerald = Color(0xFF00E676);
   static const Color amber = Color(0xFFFFB300);

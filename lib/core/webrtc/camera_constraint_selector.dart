@@ -3,13 +3,21 @@ import 'package:flutter/foundation.dart';
 import 'adaptive_quality_controller.dart';
 
 class CameraConstraintSelector {
+  static const int maxResolutionWidth = 1920;
+  static const int maxResolutionHeight = 1080;
+  static const int defaultResolutionWidth = 1280;
+  static const int defaultResolutionHeight = 720;
+  static const int maxFpsLimit = 30;
+
   /// Builds media constraints matching the negotiated send resolution tier and call mode.
   /// When [isAudioOnly] is true, video is completely disabled ('video': false).
+  /// Maximum capture resolution is capped to 1920x1080 at 30fps (defaulting to 1280x720 at 30fps for stability)
+  /// and removes 4K capture constraints that overload Android MediaCodec and macOS ScreenCaptureKit.
   static Map<String, dynamic> getMediaConstraintsForTier(
     ResolutionTier tier, {
     bool isFrontCamera = true,
     bool isAudioOnly = false,
-    int maxFps = 30,
+    int maxFps = maxFpsLimit,
   }) {
     final audioConstraints = _getAudioConstraints();
 
@@ -20,18 +28,33 @@ class CameraConstraintSelector {
       };
     }
 
+    final int targetWidth;
+    final int targetHeight;
+
+    if (tier == ResolutionTier.p720) {
+      targetWidth = defaultResolutionWidth;
+      targetHeight = defaultResolutionHeight;
+    } else {
+      // Capped to 1920x1080 for 1080p, 1440p, and 4K tiers to protect hardware encoders
+      targetWidth = maxResolutionWidth;
+      targetHeight = maxResolutionHeight;
+    }
+
+    final cappedFps = maxFps.clamp(15, maxFpsLimit);
+
     return {
       'audio': audioConstraints,
       'video': {
         'mandatory': {
-          'minWidth': tier.width.toString(),
-          'minHeight': tier.height.toString(),
-          'minFrameRate': '30',
+          'minWidth': defaultResolutionWidth.toString(),
+          'minHeight': defaultResolutionHeight.toString(),
+          'maxWidth': targetWidth.toString(),
+          'maxHeight': targetHeight.toString(),
+          'minFrameRate': '15',
+          'maxFrameRate': cappedFps.toString(),
         },
         'facingMode': isFrontCamera ? 'user' : 'environment',
-        'optional': [
-          {'maxFrameRate': maxFps.toString()},
-        ],
+        'optional': <Map<String, dynamic>>[],
       },
     };
   }
@@ -78,10 +101,11 @@ class CameraConstraintSelector {
     ResolutionTier tier, {
     int? maxFramerate,
   }) {
+    final bitrate = tier == ResolutionTier.p720 ? 2500000 : 5000000;
     return {
-      'maxBitrate': tier.targetBitrateBps,
+      'maxBitrate': bitrate,
       'scaleResolutionDownBy': tier.scaleResolutionDownBy,
-      'maxFramerate': maxFramerate ?? tier.targetFps,
+      'maxFramerate': (maxFramerate ?? tier.targetFps).clamp(15, maxFpsLimit),
     };
   }
 }
