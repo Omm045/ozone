@@ -160,10 +160,67 @@ flutter run -d android
 
 ---
 
+## Local Setup (Post-Clone)
+
+Because Firebase credentials and configuration files are excluded from version control to prevent secret leaks, freshly cloned repositories do not include them.
+
+After cloning, generate your local configuration:
+
+```bash
+# 1. Install FlutterFire CLI if you haven't already:
+dart pub global activate flutterfire_cli
+
+# 2. Run configure to generate local files:
+flutterfire configure --project=ozone-fc7f5
+```
+
+This generates the following files locally:
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+- `macos/Runner/GoogleService-Info.plist`
+- `lib/firebase_options.dart`
+
+> [!IMPORTANT]
+> **Git History & Secret Rotation Notice**:
+> Adding files to `.gitignore` prevents future leaks going forward, but does **not** erase them from past Git commits. Old leaked credentials remain accessible in the repository's commit history unless the history is rewritten using tools like `git filter-repo` or `BFG Repo-Cleaner`. Rewriting Git history is destructive and requires force-pushing, which breaks existing clones. Any exposed API keys must be rotated immediately in Google Cloud Console / Firebase Console.
+
+---
+
+## macOS Gatekeeper & Distribution Notice
+
+When running or installing an app bundle distributed outside the Mac App Store, macOS Gatekeeper may display a warning: *"Ozone can't be opened because Apple cannot check it for malicious software"* or *"developer cannot be verified"*.
+
+This is standard macOS security behavior for apps built with a free (non-paid) Apple Developer account. There is no code-level fix for an unnotarized binary.
+
+### Options:
+
+1. **For Local / Personal / Ad-Hoc Testing (Free)**:
+   - Do not double-click `ozone.app`.
+   - **Right-click (or Control-click) `ozone.app` → select "Open" → click "Open"** in the security confirmation dialog.
+   - This is a **one-time action per machine**; macOS remembers the exception for future launches.
+
+2. **For Official Public Distribution (Requires Paid Apple Developer Program - $99/yr)**:
+   - Requires an active Apple Developer Program membership.
+   - The release pipeline must sign the bundle with a Developer ID Application certificate and submit the artifact to Apple's Notary Service:
+     ```bash
+     # 1. Code sign with Developer ID Application certificate:
+     codesign --deep --force --options runtime --sign "Developer ID Application: Your Name (TEAM_ID)" build/macos/Build/Products/Release/ozone.app
+
+     # 2. Create notarization archive:
+     ditto -c -k --keepParent build/macos/Build/Products/Release/ozone.app build/ozone-macos.zip
+
+     # 3. Submit for notarization:
+     xcrun notarytool submit build/ozone-macos.zip --keychain-profile "AC_PASSWORD" --wait
+
+     # 4. Staple ticket to the app:
+     xcrun stapler staple build/macos/Build/Products/Release/ozone.app
+     ```
+   - Do not attempt notarization commands without an active paid Apple Developer account.
+
+---
+
 ## Backend Configuration
 
-- **Firebase Project ID**: `ozone-fc7f`
-- When launched without Firebase GoogleService files, the application automatically activates mock provider mode so developers can test UI, messaging, and call flows immediately out-of-the-box.
-- To connect to the live Firebase project:
-  - Place `google-services.json` in `android/app/`.
-  - Place `GoogleService-Info.plist` in `ios/Runner/` and `macos/Runner/`.
+- **Firebase Project ID**: `ozone-fc7f5`
+- The application connects to `ozone-fc7f5` when `firebase_options.dart` and platform GoogleService files are present.
+- If launched in an environment without configured Firebase credentials, the application can activate mock provider mode for offline UI and pipeline development.

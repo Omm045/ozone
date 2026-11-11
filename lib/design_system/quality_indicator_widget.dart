@@ -61,7 +61,7 @@ class QualityIndicatorWidget extends StatelessWidget {
             _buildSignalBars(state.signalStrength),
             const SizedBox(width: 8),
             Text(
-              state.tier.name,
+              '${state.tier.name} · ${state.fps}fps',
               style: const TextStyle(
                 color: OzoneTheme.emerald,
                 fontSize: 12,

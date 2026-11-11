@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../models/user_model.dart';
+import '../database/chat_repository.dart';
 import 'auth_service.dart';
 
 enum AuthStatus {
@@ -136,6 +137,31 @@ class OzoneAuthProvider extends ChangeNotifier {
     _status = AuthStatus.unauthenticated;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  Future<bool> deleteAccount({
+    String? password,
+    required ChatRepository chatRepository,
+  }) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.deleteAccount(
+        password: password,
+        chatRepository: chatRepository,
+      );
+      _currentUser = null;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _status = AuthStatus.error;
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
   }
 
   void clearError() {

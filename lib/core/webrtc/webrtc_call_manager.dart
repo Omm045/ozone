@@ -60,6 +60,9 @@ class WebRtcCallManager extends ChangeNotifier {
   double _previousTimestamp = 0;
   int _statsCounter = 0;
   ResolutionTier? _lastAppliedTier;
+  int _nativeMaxFps = 30;
+  String _activeCodec = 'VP9';
+  String _activeEncoder = 'Hardware (VideoToolbox/MediaCodec)';
   bool isSimulatorTestMode = const bool.fromEnvironment('TEST_MODE', defaultValue: false);
 
   WebRtcCallManager({
@@ -93,6 +96,9 @@ class WebRtcCallManager extends ChangeNotifier {
   Set<String> get gatheredCandidateTypes => Set.unmodifiable(_gatheredCandidateTypes);
   List<String> get sessionLogs => List.unmodifiable(_sessionLogs);
   String? get connectedPair => _connectedPair;
+  int get nativeMaxFps => _nativeMaxFps;
+  String get activeCodec => _activeCodec;
+  String get activeEncoder => _activeEncoder;
 
   Future<void> toggleSpeakerphone() async {
     _isSpeakerphoneOn = !_isSpeakerphoneOn;
@@ -233,8 +239,8 @@ class WebRtcCallManager extends ChangeNotifier {
       'offerToReceiveVideo': callType == CallType.audio ? 0 : 1,
     });
 
-    // Munge SDP to prioritize VP8 and Baseline H.264 for cross-platform stability
-    final mungedOfferSdp = SdpUtils.preferCompatibleVideoCodecs(offer.sdp ?? '');
+    // Munge SDP to prioritize VP9 / Baseline H.264 and tune Opus audio to 64kbps FEC
+    final mungedOfferSdp = SdpUtils.optimizeSdp(offer.sdp ?? '');
     final mungedOffer = RTCSessionDescription(mungedOfferSdp, offer.type);
     await _peerConnection!.setLocalDescription(mungedOffer);
 
@@ -270,7 +276,7 @@ class WebRtcCallManager extends ChangeNotifier {
           _status != CallStatus.connected) {
         _log('Received answer from callee.');
         try {
-          final mungedAnswerSdp = SdpUtils.preferCompatibleVideoCodecs(session.answer!['sdp'] as String);
+          final mungedAnswerSdp = SdpUtils.optimizeSdp(session.answer!['sdp'] as String);
           final answer = RTCSessionDescription(
             mungedAnswerSdp,
             session.answer!['type'] as String,
@@ -327,7 +333,7 @@ class WebRtcCallManager extends ChangeNotifier {
     // Set Remote Description from Offer
     if (session.offer != null) {
       try {
-        final mungedOfferSdp = SdpUtils.preferCompatibleVideoCodecs(session.offer!['sdp'] as String);
+        final mungedOfferSdp = SdpUtils.optimizeSdp(session.offer!['sdp'] as String);
         final offer = RTCSessionDescription(
           mungedOfferSdp,
           session.offer!['type'] as String,
@@ -350,7 +356,7 @@ class WebRtcCallManager extends ChangeNotifier {
     });
 
     // Munge SDP to prioritize VP8 and Baseline H.264
-    final mungedAnswerSdp = SdpUtils.preferCompatibleVideoCodecs(answer.sdp ?? '');
+    final mungedAnswerSdp = SdpUtils.optimizeSdp(answer.sdp ?? '');
     final mungedAnswer = RTCSessionDescription(mungedAnswerSdp, answer.type);
     await _peerConnection!.setLocalDescription(mungedAnswer);
 
@@ -429,12 +435,20 @@ class WebRtcCallManager extends ChangeNotifier {
       _log('Device enumeration note: $e');
     }
 
-    // 1. Get User Media with safe resolution constraints capped at 1080p 30fps
+    int nativeFps = 30;
+    if (!isAudioOnly && !isSimulatorTestMode) {
+      nativeFps = await CameraConstraintSelector.queryNativeMaxFpsAt1080p(isFrontCamera: _isFrontCamera);
+      _nativeMaxFps = nativeFps;
+      qualityController.setNativeMaxFps(nativeFps);
+      _log('Device camera native max FPS at 1080p: ${nativeFps}fps');
+    }
+
+    // 1. Get User Media with resolution constraints at 1080p native max FPS
     final mediaConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
       qualityController.currentTier,
       isFrontCamera: _isFrontCamera,
       isAudioOnly: isAudioOnly,
-      maxFps: 30,
+      maxFps: nativeFps,
     );
 
     try {
@@ -461,6 +475,15 @@ class WebRtcCallManager extends ChangeNotifier {
 
     final audioTracks = _localStream!.getAudioTracks();
     final videoTracks = _localStream!.getVideoTracks();
+    if (videoTracks.isNotEmpty) {
+      final actualSettings = videoTracks.first.getSettings();
+      final reportedFps = (actualSettings['frameRate'] as num?)?.round();
+      if (reportedFps != null && reportedFps > 0) {
+        _nativeMaxFps = reportedFps;
+        qualityController.setNativeMaxFps(reportedFps);
+        _log('Verified local video track running at ${reportedFps}fps (settings: $actualSettings)');
+      }
+    }
 
     try {
       await Helper.setMicrophoneMuted(false);
@@ -790,6 +813,13 @@ class WebRtcCallManager extends ChangeNotifier {
           final h = int.tryParse(values['frameHeight']?.toString() ?? '');
           if (w != null && w > 0) sentWidth = w;
           if (h != null && h > 0) sentHeight = h;
+
+          if (values['encoderImplementation'] != null) {
+            _activeEncoder = values['encoderImplementation'].toString();
+          }
+        } else if (report.type == 'codec' && (values['mimeType'] ?? '').toString().toLowerCase().contains('video')) {
+          final mime = values['mimeType'].toString();
+          _activeCodec = mime.split('/').last.toUpperCase();
         } else if (report.type == 'inbound-rtp' && values['kind'] == 'video') {
           final bytes = int.tryParse(values['bytesReceived']?.toString() ?? '') ?? currentBytesReceived;
           if (bytes >= _previousBytesReceived && _previousTimestamp > 0) {
@@ -919,26 +949,17 @@ class WebRtcCallManager extends ChangeNotifier {
       final parameters = _videoSender!.parameters;
       final encodings = parameters.encodings;
       if (encodings != null && encodings.isNotEmpty) {
-        final int maxBitrate;
-        switch (tier) {
-          case ResolutionTier.p4k:
-          case ResolutionTier.p1440:
-          case ResolutionTier.p1080:
-            maxBitrate = 5000000; // Excellent: up to 5000000 bps
-            break;
-          case ResolutionTier.p720:
-            maxBitrate = 2500000; // Good: 2500000 bps
-            break;
-        }
+        final int maxBitrate = tier.targetBitrateBps;
+        final int targetFps = (_nativeMaxFps > 0 ? _nativeMaxFps : tier.targetFps);
 
         for (final encoding in encodings) {
           encoding.maxBitrate = maxBitrate;
-          encoding.maxFramerate = 30;
+          encoding.maxFramerate = targetFps;
           encoding.scaleResolutionDownBy = tier.scaleResolutionDownBy;
         }
         _videoSender!.setParameters(parameters);
         _lastAppliedTier = tier;
-        _log('Applied RTCRtpSender encoding parameters for $tier: maxBitrate=$maxBitrate bps, maxFramerate=30');
+        _log('Applied RTCRtpSender encoding parameters for $tier: maxBitrate=$maxBitrate bps, maxFramerate=$targetFps, scaleDown=${tier.scaleResolutionDownBy}');
       }
     } catch (e) {
       _log('Note: Error applying encoding parameters: $e');

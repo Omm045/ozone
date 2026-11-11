@@ -1,8 +1,11 @@
 class SdpUtils {
-  /// Munges SDP to prefer VP8 and Baseline/Constrained-Baseline H.264 codecs
-  /// in the m=video line. This prevents cross-platform video freezing when
-  /// Apple Silicon VideoToolbox hardware encoder (which defaults to H.264 High Profile)
-  /// negotiates with Android devices whose MediaCodec decoders often freeze or drop frames.
+  /// Munges SDP to optimize video and audio codec negotiation for high-end P2P calls:
+  /// 1. Video: Prioritizes VP9 (superior compression efficiency), followed by
+  ///    Baseline/Constrained-Baseline H.264 (broad hardware acceleration across Apple
+  ///    VideoToolbox and Android MediaCodec without High Profile freeze bugs),
+  ///    then Main/High H.264, then VP8 fallback.
+  /// 2. Audio: Tunes Opus to 64 kbps (crystal clear voice), enables in-band FEC
+  ///    for packet loss resilience, and sets mono CBR for bandwidth efficiency.
   static String preferCompatibleVideoCodecs(String sdp) {
     if (sdp.isEmpty) return sdp;
 
@@ -40,29 +43,87 @@ class SdpUtils {
       }
     }
 
-    final vp8Pts = <String>[];
+    final vp9Pts = <String>[];
     final baselineH264Pts = <String>[];
+    final otherH264Pts = <String>[];
+    final vp8Pts = <String>[];
     final otherPts = <String>[];
 
     for (final pt in payloadTypes) {
       final codec = ptToCodec[pt];
-      if (codec == 'VP8') {
-        vp8Pts.add(pt);
+      if (codec == 'VP9') {
+        vp9Pts.add(pt);
       } else if (codec == 'H264') {
         final fmtp = ptToFmtp[pt] ?? '';
         // Baseline / Constrained-Baseline profile starts with 42 (e.g. 42001f, 42e01f)
         if (fmtp.contains('profile-level-id=42')) {
           baselineH264Pts.add(pt);
         } else {
-          otherPts.add(pt);
+          otherH264Pts.add(pt);
         }
+      } else if (codec == 'VP8') {
+        vp8Pts.add(pt);
       } else {
         otherPts.add(pt);
       }
     }
 
-    final reordered = [...vp8Pts, ...baselineH264Pts, ...otherPts];
+    final reordered = [
+      ...vp9Pts,
+      ...baselineH264Pts,
+      ...otherH264Pts,
+      ...vp8Pts,
+      ...otherPts,
+    ];
     lines[mVideoIndex] = '${header.join(' ')} ${reordered.join(' ')}';
     return lines.join(newline);
+  }
+
+  /// Tunes Opus audio parameters in SDP for high-clarity voice communication.
+  /// Targets 64 kbps (high-fidelity voice), enables in-band forward error correction (FEC)
+  /// to recover from packet loss without retransmission, and sets mono (stereo=0)
+  /// to eliminate wasted bandwidth on dual-channel voice.
+  static String tuneOpusAudio(String sdp, {int bitrateBps = 64000}) {
+    if (sdp.isEmpty) return sdp;
+
+    final newline = sdp.contains('\r\n') ? '\r\n' : '\n';
+    final lines = sdp.split(newline);
+
+    String? opusPt;
+    for (final line in lines) {
+      if (line.startsWith('a=rtpmap:') && line.toLowerCase().contains('opus/48000')) {
+        final spaceIdx = line.indexOf(' ');
+        if (spaceIdx != -1) {
+          opusPt = line.substring(9, spaceIdx);
+          break;
+        }
+      }
+    }
+
+    if (opusPt == null) return sdp;
+
+    final fmtpPrefix = 'a=fmtp:$opusPt ';
+    final fmtpIndex = lines.indexWhere((l) => l.startsWith(fmtpPrefix));
+
+    const opusParams = 'minptime=10;useinbandfec=1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;cbr=1';
+
+    if (fmtpIndex != -1) {
+      lines[fmtpIndex] = '$fmtpPrefix$opusParams';
+    } else {
+      // Insert fmtp line right after rtpmap
+      final rtpmapIndex = lines.indexWhere((l) => l.startsWith('a=rtpmap:$opusPt '));
+      if (rtpmapIndex != -1) {
+        lines.insert(rtpmapIndex + 1, '$fmtpPrefix$opusParams');
+      }
+    }
+
+    return lines.join(newline);
+  }
+
+  /// Complete SDP optimization for video and audio.
+  static String optimizeSdp(String sdp) {
+    var result = preferCompatibleVideoCodecs(sdp);
+    result = tuneOpusAudio(result);
+    return result;
   }
 }

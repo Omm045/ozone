@@ -6,7 +6,6 @@ import 'package:ozone/core/auth/auth_provider.dart';
 import 'package:ozone/core/auth/auth_service.dart';
 import 'package:ozone/core/database/chat_repository.dart';
 import 'package:ozone/core/webrtc/webrtc_call_manager.dart';
-import 'package:ozone/core/webrtc/webrtc_mesh_conference_manager.dart';
 import 'package:ozone/design_system/ozone_theme.dart';
 import 'package:ozone/features/auth/auth_screen.dart';
 import 'package:ozone/features/chats/connect_by_email_dialog.dart';
@@ -190,36 +189,6 @@ void main() {
       }
 
       manager.dispose();
-    });
-
-    testWidgets('Flow 4: Multi-Peer Mesh Conference Room Grid & Room Code Sharing', (tester) async {
-      final confManager = WebRtcMeshConferenceManager();
-      confManager.addMockRemoteParticipantForTesting('peer_alpha', 'Alpha');
-      confManager.addMockRemoteParticipantForTesting('peer_beta', 'Beta');
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: OzoneTheme.darkTheme,
-          home: CallScreen(
-            conferenceManager: confManager,
-            roomId: 'conf_mesh_777',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // With 2 remote peers (3 total participants), it switches to the responsive multi-peer grid
-      expect(find.byType(GridView), findsOneWidget);
-      expect(find.text('Alpha'), findsOneWidget);
-      expect(find.text('Beta'), findsOneWidget);
-
-      // Share Room Code button in top bar
-      expect(find.text('Share'), findsOneWidget);
-      await tester.tap(find.text('Share'));
-      await tester.pump();
-      expect(find.byType(SnackBar), findsOneWidget);
-
-      confManager.dispose();
     });
   });
 }

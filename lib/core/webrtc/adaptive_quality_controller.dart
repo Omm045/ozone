@@ -13,7 +13,7 @@ enum ResolutionTier {
     width: 1920,
     height: 1080,
     targetFps: 30,
-    targetBitrateBps: 5000000,
+    targetBitrateBps: 5500000,
     minHeadroomForStepUpBps: 9000000,
     scaleResolutionDownBy: 1.0,
   ),
@@ -31,7 +31,7 @@ enum ResolutionTier {
     width: 3840,
     height: 2160,
     targetFps: 30,
-    targetBitrateBps: 25000000,
+    targetBitrateBps: 20000000,
     minHeadroomForStepUpBps: 999999999,
     scaleResolutionDownBy: 1.0,
   );
@@ -244,6 +244,7 @@ class AdaptiveQualityController {
   ResolutionTier? _manualTier;
   final int consecutiveGoodSamplesRequired;
   bool deviceSupports60Fps = false;
+  int nativeMaxFps = 30;
 
   int _consecutiveGoodSamples = 0;
   NetworkStatsSample? _lastSample;
@@ -254,6 +255,7 @@ class AdaptiveQualityController {
     this.consecutiveGoodSamplesRequired = 3,
     ResolutionTier? manualTier,
     this.deviceSupports60Fps = false,
+    this.nativeMaxFps = 30,
   })  : _currentTier = manualTier ?? initialTier,
         _manualTier = manualTier;
 
@@ -263,7 +265,12 @@ class AdaptiveQualityController {
   int get consecutiveGoodSamples => _consecutiveGoodSamples;
 
   int get currentTargetFps =>
-      (deviceSupports60Fps && _currentTier >= ResolutionTier.p1080) ? 60 : 30;
+      (deviceSupports60Fps && _currentTier >= ResolutionTier.p1080) ? 60 : nativeMaxFps;
+
+  void setNativeMaxFps(int fps) {
+    nativeMaxFps = fps;
+    deviceSupports60Fps = fps >= 60;
+  }
 
   void setManualTier(ResolutionTier? tier) {
     _manualTier = tier;

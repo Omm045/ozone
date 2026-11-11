@@ -21,6 +21,7 @@ abstract class ChatRepository {
   Future<void> markRead(String chatId, String messageId);
   Future<void> deleteMessage({required String chatId, required String messageId});
   Future<void> removeChat({required String chatId, required String userUid});
+  Future<void> deleteUserData(String userUid);
   Stream<CallSession?> getIncomingCallsStream(String userUid);
   Future<void> declineCall(String callId);
 }
@@ -226,6 +227,37 @@ class FirestoreChatRepository implements ChatRepository {
       await docRef.update({
         'hiddenFor': FieldValue.arrayUnion([userUid]),
       });
+    }
+  }
+
+  @override
+  Future<void> deleteUserData(String userUid) async {
+    // 1. Delete user document in /users/{uid}
+    try {
+      await _firestore.collection('users').doc(userUid).delete();
+    } catch (e) {
+      debugPrint('[FirestoreChatRepository] Error deleting user profile doc: $e');
+    }
+
+    // 2. Query chats where user is a participant and clean up
+    try {
+      final chatsQuery = await _firestore
+          .collection('chats')
+          .where('participantUids', arrayContains: userUid)
+          .get();
+
+      if (chatsQuery.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in chatsQuery.docs) {
+          batch.update(doc.reference, {
+            'hiddenFor': FieldValue.arrayUnion([userUid]),
+            'participantUids': FieldValue.arrayRemove([userUid]),
+          });
+        }
+        await batch.commit();
+      }
+    } catch (e) {
+      debugPrint('[FirestoreChatRepository] Error cleaning up user chats: $e');
     }
   }
 
@@ -459,6 +491,24 @@ class MockChatRepository implements ChatRepository {
     } else {
       final updatedHidden = Set<String>.from(chat.hiddenFor)..add(userUid);
       _chats[chatId] = chat.copyWith(hiddenFor: updatedHidden.toList());
+    }
+    _emitChats();
+  }
+
+  @override
+  Future<void> deleteUserData(String userUid) async {
+    _users.removeWhere((email, u) => u.uid == userUid);
+    final chatKeys = _chats.keys.toList();
+    for (final key in chatKeys) {
+      final chat = _chats[key]!;
+      if (chat.participantUids.contains(userUid)) {
+        final updatedParticipants = List<String>.from(chat.participantUids)..remove(userUid);
+        final updatedHidden = Set<String>.from(chat.hiddenFor)..add(userUid);
+        _chats[key] = chat.copyWith(
+          participantUids: updatedParticipants,
+          hiddenFor: updatedHidden.toList(),
+        );
+      }
     }
     _emitChats();
   }

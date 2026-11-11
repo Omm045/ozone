@@ -7,6 +7,7 @@ import '../../models/chat_model.dart';
 import '../../design_system/ozone_theme.dart';
 import 'connect_by_email_dialog.dart';
 import '../conversation/conversation_screen.dart';
+import '../settings/settings_screen.dart';
 
 class ChatListScreen extends StatelessWidget {
   final ChatRepository chatRepository;
@@ -115,6 +116,18 @@ class ChatListScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          IconButton(
+            key: const Key('settingsButton'),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(chatRepository: chatRepository),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign Out',

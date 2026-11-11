@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:ozone/core/webrtc/webrtc_call_manager.dart';
-import 'package:ozone/core/webrtc/webrtc_mesh_conference_manager.dart';
 import 'package:ozone/design_system/ozone_theme.dart';
 import 'package:ozone/design_system/quality_indicator_widget.dart';
 import 'package:ozone/features/call/call_screen.dart';
@@ -72,23 +71,6 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      // Action 3: Switch into 4-peer Mesh Conference Grid layout
-      final confManager = WebRtcMeshConferenceManager();
-      confManager.addMockRemoteParticipantForTesting('peer_1', 'Alice');
-      confManager.addMockRemoteParticipantForTesting('peer_2', 'Bob');
-      confManager.addMockRemoteParticipantForTesting('peer_3', 'Charlie');
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: OzoneTheme.darkTheme,
-          home: CallScreen(
-            conferenceManager: confManager,
-            roomId: 'conf_smoothness_room',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
       // Measure timings
       if (frameTimings.isNotEmpty) {
         // Isolate interactive steady-state frames by excluding tree-mounting / route transitions (> 30ms)
@@ -126,7 +108,6 @@ void main() {
       }
 
       manager.dispose();
-      confManager.dispose();
     });
   });
 }

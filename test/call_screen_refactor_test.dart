@@ -19,7 +19,7 @@ void main() {
       manager.dispose();
     });
 
-    test('SDP Munging: prefers VP8 and Baseline H.264 over High Profile H.264', () {
+    test('SDP Munging: prefers VP9, Baseline H.264, and tunes Opus audio to 64kbps', () {
       const sampleSdp =
           'v=0\r\n'
           'm=video 9 UDP/TLS/RTP/SAVPF 96 97 98 100\r\n'
@@ -28,11 +28,15 @@ void main() {
           'a=rtpmap:97 H264/90000\r\n'
           'a=fmtp:97 profile-level-id=42e01f\r\n'
           'a=rtpmap:98 VP8/90000\r\n'
-          'a=rtpmap:100 VP9/90000\r\n';
+          'a=rtpmap:100 VP9/90000\r\n'
+          'm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n'
+          'a=rtpmap:111 opus/48000/2\r\n';
 
-      final munged = SdpUtils.preferCompatibleVideoCodecs(sampleSdp);
-      // VP8 (98) and Baseline H264 (97) must precede High Profile H264 (96)
-      expect(munged, contains('m=video 9 UDP/TLS/RTP/SAVPF 98 97 96 100'));
+      final munged = SdpUtils.optimizeSdp(sampleSdp);
+      // VP9 (100) and Baseline H264 (97) must precede High Profile H264 (96) and VP8 (98)
+      expect(munged, contains('m=video 9 UDP/TLS/RTP/SAVPF 100 97 96 98'));
+      // Opus audio is tuned to 64kbps with FEC enabled
+      expect(munged, contains('a=fmtp:111 minptime=10;useinbandfec=1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;cbr=1'));
     });
 
     test('Camera constraints cap maximum resolution at 1920x1080 at 30fps and remove 4K constraints', () {

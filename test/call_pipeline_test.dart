@@ -455,8 +455,8 @@ void main() {
       expect(reconstructed.callType, CallType.audio);
     });
 
-    test('Part 4 & 5: 4K target bitrate is 25 Mbps and 60fps capability toggles target FPS', () {
-      expect(ResolutionTier.p4k.targetBitrateBps, 25000000);
+    test('Part 4 & 5: 4K target bitrate is 20 Mbps and 60fps capability toggles target FPS', () {
+      expect(ResolutionTier.p4k.targetBitrateBps, 20000000);
 
       final controller = AdaptiveQualityController(
         initialTier: ResolutionTier.p1080,

@@ -12,6 +12,10 @@ abstract class AuthService {
   Future<void> sendEmailVerification();
   Future<bool> checkEmailVerification();
   Future<void> signOut();
+  Future<void> deleteAccount({
+    String? password,
+    required ChatRepository chatRepository,
+  });
 }
 
 class FirebaseAuthService implements AuthService {
@@ -160,6 +164,45 @@ class FirebaseAuthService implements AuthService {
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
   }
+
+  @override
+  Future<void> deleteAccount({
+    String? password,
+    required ChatRepository chatRepository,
+  }) async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      throw Exception('No user is currently signed in.');
+    }
+
+    final uid = user.uid;
+
+    // 1. Delete user data and clean up participant lists in Firestore
+    await chatRepository.deleteUserData(uid);
+
+    // 2. Delete Firebase Auth user (with re-auth handling if required)
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        if (password != null && user.email != null) {
+          final cred = EmailAuthProvider.credential(
+            email: user.email!,
+            password: password,
+          );
+          await user.reauthenticateWithCredential(cred);
+          await user.delete();
+        } else {
+          rethrow;
+        }
+      } else {
+        rethrow;
+      }
+    }
+
+    // 3. Final sign out
+    await _firebaseAuth.signOut();
+  }
 }
 
 class MockAuthService implements AuthService {
@@ -264,6 +307,23 @@ class MockAuthService implements AuthService {
 
   @override
   Future<void> signOut() async {
+    _currentUser = null;
+    _verificationSent = false;
+  }
+
+  @override
+  Future<void> deleteAccount({
+    String? password,
+    required ChatRepository chatRepository,
+  }) async {
+    if (_currentUser == null) {
+      throw Exception('No user is currently signed in.');
+    }
+    final uid = _currentUser!.uid;
+    final email = _currentUser!.email;
+
+    await chatRepository.deleteUserData(uid);
+    _users.remove(email);
     _currentUser = null;
     _verificationSent = false;
   }

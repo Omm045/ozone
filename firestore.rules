@@ -34,18 +34,5 @@ service cloud.firestore {
         allow read, write: if isAuthenticated();
       }
     }
-
-    // Multi-peer Mesh Conferences and participant signaling subcollections
-    match /conferences/{roomId} {
-      allow read, write: if isAuthenticated();
-
-      match /participants/{participantId} {
-        allow read, write: if isAuthenticated();
-
-        match /signals/{signalId} {
-          allow read, write: if isAuthenticated();
-        }
-      }
-    }
   }
 }
