@@ -484,9 +484,11 @@ class _CallScreenState extends State<CallScreen> {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: RTCVideoView(
-                      renderer,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    child: RepaintBoundary(
+                      child: RTCVideoView(
+                        renderer,
+                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                      ),
                     ),
                   ),
                   Positioned(
@@ -530,10 +532,10 @@ class _CallScreenState extends State<CallScreen> {
     const pipHeight = 155.0;
     _pipOffset ??= Offset(screenSize.width - pipWidth - 16, 68);
 
-    if (_isMeshConference) {
-      return ListenableBuilder(
-        listenable: _conferenceManager!,
-        builder: (context, _) {
+    final Widget content = _isMeshConference
+        ? ListenableBuilder(
+            listenable: _conferenceManager!,
+            builder: (context, _) {
           final remotes = _conferenceManager!.remoteRenderers;
           final participants = _conferenceManager!.participants;
           final isScreenSharing = _conferenceManager!.isScreenSharing;
@@ -551,11 +553,13 @@ class _CallScreenState extends State<CallScreen> {
                   Positioned.fill(child: _buildConferenceGrid(remotes, participants))
                 else if (remotes.isNotEmpty)
                   Positioned.fill(
-                    child: RTCVideoView(
-                      remotes.values.first,
-                      objectFit: _isCover
-                          ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                          : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                    child: RepaintBoundary(
+                      child: RTCVideoView(
+                        remotes.values.first,
+                        objectFit: _isCover
+                            ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+                            : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                      ),
                     ),
                   )
                 else
@@ -604,10 +608,12 @@ class _CallScreenState extends State<CallScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(15),
-                          child: RTCVideoView(
-                            _conferenceManager!.localRenderer,
-                            mirror: true,
-                            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                          child: RepaintBoundary(
+                            child: RTCVideoView(
+                              _conferenceManager!.localRenderer,
+                              mirror: true,
+                              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                            ),
                           ),
                         ),
                       ),
@@ -637,13 +643,10 @@ class _CallScreenState extends State<CallScreen> {
             ),
           );
         },
-      );
-    }
-
-    // 1-on-1 Call flow
-    return ListenableBuilder(
-      listenable: _callManager,
-      builder: (context, _) {
+      )
+    : ListenableBuilder(
+        listenable: _callManager,
+        builder: (context, _) {
         final isConnected = _callManager.status == CallStatus.connected;
         final isFailed = _callManager.status == CallStatus.failed ||
             _callManager.status == CallStatus.rejected;
@@ -683,11 +686,13 @@ class _CallScreenState extends State<CallScreen> {
                               _isCover = !_isCover;
                             });
                           },
-                          child: RTCVideoView(
-                            _callManager.remoteRenderer,
-                            objectFit: _isCover
-                                ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                                : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                          child: RepaintBoundary(
+                            child: RTCVideoView(
+                              _callManager.remoteRenderer,
+                              objectFit: _isCover
+                                  ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+                                  : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                            ),
                           ),
                         ),
                 )
@@ -780,10 +785,12 @@ class _CallScreenState extends State<CallScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
                         child: _callManager.isScreenSharing
-                            ? RTCVideoView(
-                                _callManager.remoteRenderer,
-                                mirror: false,
-                                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                            ? RepaintBoundary(
+                                child: RTCVideoView(
+                                  _callManager.remoteRenderer,
+                                  mirror: false,
+                                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                                ),
                               )
                             : (_callManager.isVideoDisabled
                                 ? const Center(
@@ -793,10 +800,12 @@ class _CallScreenState extends State<CallScreen> {
                                       size: 32,
                                     ),
                                   )
-                                : RTCVideoView(
-                                    _callManager.localRenderer,
-                                    mirror: true,
-                                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                                : RepaintBoundary(
+                                    child: RTCVideoView(
+                                      _callManager.localRenderer,
+                                      mirror: true,
+                                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                                    ),
                                   )),
                       ),
                     ),
@@ -844,6 +853,8 @@ class _CallScreenState extends State<CallScreen> {
         );
       },
     );
+
+    return RepaintBoundary(child: content);
   }
 
   Widget _buildAudioControlButtons() {
