@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -338,18 +337,21 @@ class _CallScreenState extends State<CallScreen> {
     final isCameraOff = _isMeshConference ? (_conferenceManager?.isCameraOff ?? false) : _callManager.isVideoDisabled;
     final isScreenSharing = _isMeshConference ? (_conferenceManager?.isScreenSharing ?? false) : _callManager.isScreenSharing;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF13151C).withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white12, width: 1),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13151C).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.white12, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black45,
+            blurRadius: 16,
+            offset: Offset(0, 4),
           ),
-          child: Row(
+        ],
+      ),
+      child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
@@ -438,10 +440,8 @@ class _CallScreenState extends State<CallScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+        );
+      }
 
   // --- Responsive Multi-Peer Conference Grid (2x1, 2x2, 2x3) ---
   Widget _buildConferenceGrid(Map<String, RTCVideoRenderer> renderers, Map<String, ConferenceParticipant> participants) {
