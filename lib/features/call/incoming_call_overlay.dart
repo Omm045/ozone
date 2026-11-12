@@ -6,6 +6,7 @@ import '../../core/database/chat_repository.dart';
 import '../../models/call_session.dart';
 import '../../models/user_model.dart';
 import '../../design_system/ozone_theme.dart';
+import '../../core/webrtc/webrtc_call_manager.dart';
 import 'call_screen.dart';
 import '../../main.dart';
 
@@ -24,6 +25,7 @@ class _IncomingCallOverlayManagerState
   StreamSubscription<CallSession?>? _callSub;
   String? _subscribedUid;
   CallSession? _currentIncomingCall;
+  bool _isHandlingAction = false;
 
   @override
   void didChangeDependencies() {
@@ -44,6 +46,14 @@ class _IncomingCallOverlayManagerState
       _subscribedUid = user.uid;
       _callSub = chatRepository.getIncomingCallsStream(user.uid).listen((session) {
         if (mounted) {
+          // Ignore any stale incoming call document older than 45 seconds to prevent crash loops
+          if (session != null &&
+              DateTime.now().difference(session.createdAt).inSeconds > 45) {
+            if (_currentIncomingCall != null) {
+              setState(() => _currentIncomingCall = null);
+            }
+            return;
+          }
           setState(() {
             _currentIncomingCall = session;
           });
@@ -52,32 +62,51 @@ class _IncomingCallOverlayManagerState
     }
   }
 
-  void _acceptCall(CallSession session, UserModel currentUser) {
+  Future<void> _acceptCall(CallSession session, UserModel currentUser) async {
+    if (_isHandlingAction) return;
+    _isHandlingAction = true;
+
     final callerUser = UserModel(
       uid: session.callerUid,
       email: session.callerEmail,
       createdAt: session.createdAt,
     );
 
+    // Immediately dismiss the overlay UI to prevent duplicate accept events
     setState(() => _currentIncomingCall = null);
 
-    OzoneApp.navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => CallScreen(
-          caller: callerUser,
-          callee: currentUser,
-          isIncoming: true,
-          incomingSession: session,
-          callType: session.callType,
+    try {
+      // Delay Navigator.push until initializeRenderers() has completed
+      final callManager = context.read<WebRtcCallManager>();
+      await callManager.initializeRenderers();
+
+      await OzoneApp.navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => CallScreen(
+            caller: callerUser,
+            callee: currentUser,
+            isIncoming: true,
+            incomingSession: session,
+            callType: session.callType,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _isHandlingAction = false;
+    }
   }
 
   Future<void> _declineCall(CallSession session) async {
+    if (_isHandlingAction) return;
+    _isHandlingAction = true;
+
     final chatRepository = context.read<ChatRepository>();
     setState(() => _currentIncomingCall = null);
-    await chatRepository.declineCall(session.id);
+    try {
+      await chatRepository.declineCall(session.id);
+    } finally {
+      _isHandlingAction = false;
+    }
   }
 
   @override

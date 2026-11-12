@@ -72,7 +72,7 @@ class WebRtcCallManager extends ChangeNotifier {
   })  : _customFirestore = firestore,
         _iceConfigProvider = iceConfigProvider ?? const DefaultIceConfigProvider(),
         qualityController = AdaptiveQualityController(
-          initialTier: ResolutionTier.p1080,
+          initialTier: QualityPreferences.getDefaultStartingTier(),
           consecutiveGoodSamplesRequired: 5,
         ) {
     qualityController.onTierChanged = _onResolutionTierChanged;
@@ -143,10 +143,11 @@ class WebRtcCallManager extends ChangeNotifier {
 
   Future<void> loadSavedQualityPreference() async {
     final savedTier = await QualityPreferences.getSavedPreference();
-    qualityController.setManualTier(savedTier);
-    if (savedTier != null) {
-      _applyEncodingParameters(savedTier);
-    }
+    final effectiveTier = (!kIsWeb && Platform.isIOS)
+        ? ResolutionTier.p720
+        : (savedTier ?? QualityPreferences.getDefaultStartingTier());
+    qualityController.setManualTier(savedTier == null ? null : effectiveTier);
+    _applyEncodingParameters(effectiveTier);
     _qualityState = qualityController.getCurrentIndicatorState(telemetry: _latestTelemetry);
     notifyListeners();
   }
@@ -202,6 +203,11 @@ class WebRtcCallManager extends ChangeNotifier {
     try {
       if (_currentSession != null) {
         _endCallInternal(status: CallStatus.ended);
+      }
+
+      // On iOS, hard clamp quality tier to max 720p regardless of user preference
+      if (!kIsWeb && Platform.isIOS) {
+        qualityController.setManualTier(ResolutionTier.p720);
       }
 
     _isCaller = true;
@@ -333,6 +339,14 @@ class WebRtcCallManager extends ChangeNotifier {
     try {
       if (_currentSession != null && _currentSession!.id != session.id) {
         _endCallInternal(status: CallStatus.ended);
+      }
+
+      // 1) Stop any ringtone/system sound first and settle audio session
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      // On iOS, hard clamp quality tier to max 720p regardless of user preference
+      if (!kIsWeb && Platform.isIOS) {
+        qualityController.setManualTier(ResolutionTier.p720);
       }
 
     _isCaller = false;
@@ -480,13 +494,26 @@ class WebRtcCallManager extends ChangeNotifier {
       _log('Device camera native max FPS at 1080p: ${nativeFps}fps');
     }
 
-    // 1. Get User Media with resolution constraints at 1080p native max FPS
-    final mediaConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
-      qualityController.currentTier,
-      isFrontCamera: _isFrontCamera,
-      isAudioOnly: isAudioOnly,
-      maxFps: nativeFps,
-    );
+    // 1. Get User Media with safe resolution constraints
+    // On iOS, explicitly clamp to safe 1280x720 @ 30fps without mandatory maps or minWidth/minHeight
+    final mediaConstraints = (!kIsWeb && Platform.isIOS)
+        ? {
+            'audio': true,
+            'video': isAudioOnly
+                ? false
+                : {
+                    'facingMode': _isFrontCamera ? 'user' : 'environment',
+                    'width': {'ideal': 1280},
+                    'height': {'ideal': 720},
+                    'frameRate': {'ideal': 30},
+                  },
+          }
+        : CameraConstraintSelector.getMediaConstraintsForTier(
+            qualityController.currentTier,
+            isFrontCamera: _isFrontCamera,
+            isAudioOnly: isAudioOnly,
+            maxFps: nativeFps,
+          );
 
     if (!kIsWeb && Platform.isIOS) {
       try {

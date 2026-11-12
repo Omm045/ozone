@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -462,12 +464,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       items: [
                         const DropdownMenuItem<ResolutionTier?>(
                           value: null,
-                          child: Text('Auto (Adaptive: 720p - 4K)'),
+                          child: Text('Auto (Adaptive)'),
                         ),
-                        ...ResolutionTier.values.map(
+                        ...ResolutionTier.values.where((tier) {
+                          if (!kIsWeb && Platform.isIOS) {
+                            return tier == ResolutionTier.p720;
+                          }
+                          return true;
+                        }).map(
                           (tier) => DropdownMenuItem<ResolutionTier?>(
                             value: tier,
-                            child: Text('${tier.name} (${tier.width}x${tier.height})'),
+                            child: Text(
+                              tier == ResolutionTier.p4k
+                                  ? '4K (${tier.width}x${tier.height} - Desktop Only)'
+                                  : '${tier.name} (${tier.width}x${tier.height})',
+                            ),
                           ),
                         ),
                       ],

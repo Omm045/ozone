@@ -202,6 +202,23 @@ class CameraConstraintSelector {
       ]);
     }
 
+    final bool isIOS = isIOSOverrideForTesting ?? (!kIsWeb && Platform.isIOS);
+
+    // On iOS, explicitly clamp camera capture to safe 1280x720 @ 30fps using simple,
+    // native-safe constraints without mandatory maps or minWidth/minHeight to prevent
+    // fatal AVCaptureSession SIGABRT format negotiation crashes.
+    if (isIOS) {
+      return {
+        'audio': audioConstraints,
+        'video': {
+          'facingMode': isFrontCamera ? 'user' : 'environment',
+          'width': {'ideal': 1280},
+          'height': {'ideal': 720},
+          'frameRate': {'ideal': 30},
+        },
+      };
+    }
+
     // BACK CAMERA CODE PATH
     if (!isFrontCamera) {
       final int targetWidth;
@@ -246,32 +263,6 @@ class CameraConstraintSelector {
           },
           'facingMode': 'environment',
           'optional': optionalConstraints,
-        },
-      };
-    }
-
-    final bool isIOS = isIOSOverrideForTesting ?? (!kIsWeb && Platform.isIOS);
-
-    // iOS front camera: use safe native-supported 1280x720 constraints without strict
-    // minWidth / minHeight keys to avoid format negotiation crashes in AVCaptureSession.
-    if (isIOS && isFrontCamera) {
-      return {
-        'audio': audioConstraints,
-        'video': {
-          'facingMode': 'user',
-          'width': {'ideal': 1280, 'max': 1920},
-          'height': {'ideal': 720, 'max': 1080},
-          'frameRate': {'ideal': 30, 'max': 30},
-          'mandatory': {
-            'maxWidth': '1920',
-            'maxHeight': '1080',
-            'maxFrameRate': '30',
-          },
-          'optional': <Map<String, dynamic>>[
-            {'idealWidth': '1280'},
-            {'idealHeight': '720'},
-            {'maxFrameRate': '30'},
-          ],
         },
       };
     }
