@@ -40,7 +40,8 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Clear cold-start framework initialization & shader warmup frames to measure active interaction
       frameTimings.clear();
@@ -49,13 +50,13 @@ void main() {
       final signalButton = find.byType(QualityIndicatorWidget);
       if (signalButton.evaluate().isNotEmpty) {
         await tester.tap(signalButton);
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 300));
 
         // Close modal
         final closeText = find.text('Updates every 2 seconds. Tap to close.');
         if (closeText.evaluate().isNotEmpty) {
           await tester.tap(closeText);
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 300));
         }
       }
 
@@ -68,7 +69,7 @@ void main() {
           await tester.drag(pipFinder.first, const Offset(40, -60), warnIfMissed: false);
           await tester.pump(const Duration(milliseconds: 16));
         }
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 300));
       }
 
       // Measure timings
@@ -108,6 +109,7 @@ void main() {
       }
 
       manager.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
     });
   });
 }

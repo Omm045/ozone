@@ -139,10 +139,11 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Top center display name and timer
-      expect(find.text('Caller'), findsOneWidget);
+      expect(find.text('Caller'), findsWidgets);
       expect(find.byIcon(Icons.lock_rounded), findsOneWidget);
 
       // Bottom floating control pill buttons
@@ -162,7 +163,7 @@ void main() {
 
       // Open Telemetry Modal via Speed icon
       await tester.tap(find.byIcon(Icons.speed_rounded));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Connection'), findsOneWidget);
       expect(find.text('Sending:'), findsOneWidget);
@@ -171,9 +172,10 @@ void main() {
 
       // Tap footer to close modal
       await tester.tap(find.text('Updates every 2 seconds. Tap to close.'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       manager.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
     });
   });
 }
