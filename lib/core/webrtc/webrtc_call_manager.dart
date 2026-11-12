@@ -23,6 +23,8 @@ class WebRtcCallManager extends ChangeNotifier {
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+  bool _renderersInitialized = false;
+  bool _isStartingCall = false;
 
   CallSession? _currentSession;
   CallStatus _status = CallStatus.connecting;
@@ -129,8 +131,14 @@ class WebRtcCallManager extends ChangeNotifier {
   }
 
   Future<void> initializeRenderers() async {
-    await localRenderer.initialize();
-    await remoteRenderer.initialize();
+    if (_renderersInitialized) return;
+    try {
+      await localRenderer.initialize();
+      await remoteRenderer.initialize();
+      _renderersInitialized = true;
+    } catch (e) {
+      _log('Renderer initialize note: $e');
+    }
   }
 
   Future<void> loadSavedQualityPreference() async {
@@ -186,9 +194,15 @@ class WebRtcCallManager extends ChangeNotifier {
     required UserModel callee,
     CallType callType = CallType.video,
   }) async {
-    if (_currentSession != null) {
-      _endCallInternal(status: CallStatus.ended);
+    if (_isStartingCall) {
+      _log('Ignoring duplicate startOutgoingCall invocation while call is starting.');
+      return;
     }
+    _isStartingCall = true;
+    try {
+      if (_currentSession != null) {
+        _endCallInternal(status: CallStatus.ended);
+      }
 
     _isCaller = true;
     _status = CallStatus.ringing;
@@ -305,12 +319,21 @@ class WebRtcCallManager extends ChangeNotifier {
 
     // Listen for Callee ICE Candidates
     _listenForRemoteCandidates(callDoc.id, isCaller: true);
+    } finally {
+      _isStartingCall = false;
+    }
   }
 
   Future<void> acceptIncomingCall({required CallSession session}) async {
-    if (_currentSession != null && _currentSession!.id != session.id) {
-      _endCallInternal(status: CallStatus.ended);
+    if (_isStartingCall) {
+      _log('Ignoring duplicate acceptIncomingCall invocation while call is starting.');
+      return;
     }
+    _isStartingCall = true;
+    try {
+      if (_currentSession != null && _currentSession!.id != session.id) {
+        _endCallInternal(status: CallStatus.ended);
+      }
 
     _isCaller = false;
     _currentSession = session;
@@ -388,6 +411,9 @@ class WebRtcCallManager extends ChangeNotifier {
 
     // Listen for Caller ICE Candidates
     _listenForRemoteCandidates(session.id, isCaller: false);
+    } finally {
+      _isStartingCall = false;
+    }
   }
 
   void _onMediaSetupFailed(Object error) {
@@ -462,11 +488,43 @@ class WebRtcCallManager extends ChangeNotifier {
       maxFps: nativeFps,
     );
 
+    if (!kIsWeb && Platform.isIOS) {
+      try {
+        await Helper.setAppleAudioConfiguration(
+          AppleAudioConfiguration(
+            appleAudioCategory: AppleAudioCategory.playAndRecord,
+            appleAudioCategoryOptions: {
+              AppleAudioCategoryOption.allowBluetooth,
+              AppleAudioCategoryOption.defaultToSpeaker,
+              AppleAudioCategoryOption.mixWithOthers,
+            },
+            appleAudioMode: isAudioOnly ? AppleAudioMode.voiceChat : AppleAudioMode.videoChat,
+          ),
+        );
+        _log('Configured AppleAudioConfiguration cleanly before getUserMedia');
+      } catch (e) {
+        _log('Apple audio configuration note: $e');
+      }
+    }
+
     try {
       _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     } catch (e) {
       _log('Initial getUserMedia note: $e');
-      if (isSimulatorTestMode || Platform.isIOS || Platform.isMacOS) {
+      if (!isAudioOnly) {
+        _log('Retrying getUserMedia with safe standard camera constraints.');
+        try {
+          _localStream = await navigator.mediaDevices.getUserMedia({
+            'audio': true,
+            'video': {
+              'facingMode': _isFrontCamera ? 'user' : 'environment',
+            },
+          });
+        } catch (retryError) {
+          _log('Safe camera getUserMedia retry failed: $retryError');
+        }
+      }
+      if (_localStream == null && (isSimulatorTestMode || Platform.isIOS || Platform.isMacOS)) {
         _log('Simulator test mode active: falling back to audio-only stream to bypass simulator camera absence.');
         isSimulatorTestMode = true;
         try {
@@ -480,15 +538,17 @@ class WebRtcCallManager extends ChangeNotifier {
         rethrow;
       }
     }
+
+    await initializeRenderers();
     if (!isAudioOnly) {
       localRenderer.srcObject = _localStream;
     }
 
-    if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+    if (!kIsWeb && Platform.isAndroid) {
       try {
         await Helper.setSpeakerphoneOn(true);
         _isSpeakerOn = true;
-        _log('Enforced speakerphone on mobile: true');
+        _log('Enforced speakerphone on Android: true');
       } catch (e) {
         _log('Speakerphone initial routing note: $e');
       }
@@ -607,8 +667,13 @@ class WebRtcCallManager extends ChangeNotifier {
       _log('Peer Connection State changed: $state');
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
-          Helper.setSpeakerphoneOn(_isSpeakerOn).catchError((e) {
-            _log('Speakerphone re-assert note: $e');
+          Future.delayed(const Duration(milliseconds: 300), () async {
+            try {
+              await Helper.setSpeakerphoneOn(_isSpeakerOn);
+              _log('Enforced speakerphone after connection: $_isSpeakerOn');
+            } catch (e) {
+              _log('Speakerphone re-assert note: $e');
+            }
           });
         }
         _handleConnectionRecovered();
@@ -1220,9 +1285,11 @@ class WebRtcCallManager extends ChangeNotifier {
     _statsTimer?.cancel();
     _endCallInternal(status: CallStatus.ended);
     try {
+      localRenderer.srcObject = null;
       localRenderer.dispose();
     } catch (_) {}
     try {
+      remoteRenderer.srcObject = null;
       remoteRenderer.dispose();
     } catch (_) {}
     super.dispose();

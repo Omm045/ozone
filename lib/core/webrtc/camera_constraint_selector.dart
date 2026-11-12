@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'adaptive_quality_controller.dart';
@@ -12,6 +13,7 @@ class CameraConstraintSelector {
 
   static final Map<bool, int> _cachedCameraMaxFps = {};
   static ({int width, int height, double aspectRatio})? _cachedFrontCameraNativeFormat;
+  static bool? isIOSOverrideForTesting;
 
   static void setMockFrontCameraFormatForTesting({
     required int width,
@@ -146,6 +148,7 @@ class CameraConstraintSelector {
   static void clearCacheForTesting() {
     _cachedCameraMaxFps.clear();
     _cachedFrontCameraNativeFormat = null;
+    isIOSOverrideForTesting = null;
   }
 
   /// Convenience wrapper to retrieve media constraints.
@@ -243,6 +246,32 @@ class CameraConstraintSelector {
           },
           'facingMode': 'environment',
           'optional': optionalConstraints,
+        },
+      };
+    }
+
+    final bool isIOS = isIOSOverrideForTesting ?? (!kIsWeb && Platform.isIOS);
+
+    // iOS front camera: use safe native-supported 1280x720 constraints without strict
+    // minWidth / minHeight keys to avoid format negotiation crashes in AVCaptureSession.
+    if (isIOS && isFrontCamera) {
+      return {
+        'audio': audioConstraints,
+        'video': {
+          'facingMode': 'user',
+          'width': {'ideal': 1280, 'max': 1920},
+          'height': {'ideal': 720, 'max': 1080},
+          'frameRate': {'ideal': 30, 'max': 30},
+          'mandatory': {
+            'maxWidth': '1920',
+            'maxHeight': '1080',
+            'maxFrameRate': '30',
+          },
+          'optional': <Map<String, dynamic>>[
+            {'idealWidth': '1280'},
+            {'idealHeight': '720'},
+            {'maxFrameRate': '30'},
+          ],
         },
       };
     }

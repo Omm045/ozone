@@ -108,6 +108,32 @@ void main() {
       CameraConstraintSelector.clearCacheForTesting();
     });
 
+    test('iOS front camera constraints use safe 1280x720 without strict minWidth/minHeight rejection keys', () {
+      CameraConstraintSelector.isIOSOverrideForTesting = true;
+      final iosConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
+        ResolutionTier.p1080,
+        isFrontCamera: true,
+      );
+      final video = iosConstraints['video'] as Map<String, dynamic>;
+      expect(video['facingMode'], 'user');
+      final width = video['width'] as Map<String, dynamic>;
+      final height = video['height'] as Map<String, dynamic>;
+      expect(width['ideal'], 1280);
+      expect(width['max'], 1920);
+      expect(width.containsKey('min'), isFalse);
+      expect(height['ideal'], 720);
+      expect(height['max'], 1080);
+      expect(height.containsKey('min'), isFalse);
+
+      final mandatory = video['mandatory'] as Map<String, dynamic>;
+      expect(mandatory.containsKey('minWidth'), isFalse);
+      expect(mandatory.containsKey('minHeight'), isFalse);
+      expect(mandatory['maxWidth'], '1920');
+      expect(mandatory['maxHeight'], '1080');
+
+      CameraConstraintSelector.clearCacheForTesting();
+    });
+
     test('Call duration timer starts at 00:00 on connection and resets for a new call', () async {
       final manager = WebRtcCallManager();
       // Before connection: duration is 0
