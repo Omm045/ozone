@@ -188,6 +188,23 @@ This generates the following files locally:
 
 ---
 
+## iOS Installation & Sideloading (Free)
+
+For users installing the unsigned `.ipa` (`ozone-ios-v1.1.0.ipa`) via **Sideloadly** or **AltStore**:
+
+1. **Sideloadly**:
+   - Drag and drop `ozone-ios-v1.1.0.ipa` into Sideloadly.
+   - Enter your Apple ID and click **Start**.
+   - You can keep default settings, or under **Advanced Options**, you can optionally uncheck *"Use automatic bundle ID"* if you prefer to retain the exact `com.ozone.app.ozone` identifier.
+   - On your iOS device, navigate to **Settings → General → VPN & Device Management** and trust your Developer App certificate.
+2. **AltStore**:
+   - Open AltStore on your iOS device, tap **My Apps → +**, select `ozone-ios-v1.1.0.ipa`, and sign in with your Apple ID to install.
+
+> [!NOTE]
+> Sideloading with a free Apple Developer account dynamically attaches your Team ID to the app's bundle identifier (e.g. `com.ozone.app.ozone.<TEAM_ID>`). The app's URL schemes and Firebase configuration support both standard and dynamic sideloaded bundle identifiers.
+
+---
+
 ## macOS Gatekeeper & Distribution Notice
 
 When running or installing an app bundle distributed outside the Mac App Store, macOS Gatekeeper may display a warning: *"Ozone can't be opened because Apple cannot check it for malicious software"* or *"developer cannot be verified"*.
