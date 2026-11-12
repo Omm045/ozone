@@ -178,6 +178,33 @@ void main() {
         expect(found?.email, email);
       },
     );
+
+    test('sendPasswordResetEmail succeeds for valid email', () async {
+      final mockAuth = MockAuthService();
+      final authProvider = OzoneAuthProvider(authService: mockAuth);
+
+      final result = await authProvider.sendPasswordResetEmail(email: 'user@ozone.test');
+      expect(result, isTrue);
+    });
+
+    test('sendPasswordResetEmail fails for empty email', () async {
+      final mockAuth = MockAuthService();
+      final authProvider = OzoneAuthProvider(authService: mockAuth);
+
+      final result = await authProvider.sendPasswordResetEmail(email: '');
+      expect(result, isFalse);
+      expect(authProvider.errorMessage, contains('Invalid email address format'));
+    });
+
+    test('signInWithGoogle signs in user and updates provider state', () async {
+      final mockAuth = MockAuthService();
+      final authProvider = OzoneAuthProvider(authService: mockAuth);
+
+      final result = await authProvider.signInWithGoogle();
+      expect(result, isTrue);
+      expect(authProvider.isAuthenticated, isTrue);
+      expect(authProvider.currentUser?.email, contains('google_user'));
+    });
   });
 }
 

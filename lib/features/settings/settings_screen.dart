@@ -22,7 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ResolutionTier? _preferredTier;
   bool _isLoadingPreference = true;
   String _appVersionDisplay = 'Loading...';
-  String _currentSemver = '1.0.1';
+  String _currentSemver = '1.1.0';
   bool _isCheckingUpdate = false;
 
   @override
@@ -54,8 +54,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _currentSemver = '1.0.1';
-          _appVersionDisplay = 'v1.0.1 (2)';
+          _currentSemver = '1.1.0';
+          _appVersionDisplay = 'v1.1.0 (3)';
         });
       }
     }

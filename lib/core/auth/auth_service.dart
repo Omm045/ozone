@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../models/user_model.dart';
 import '../database/chat_repository.dart';
 
@@ -9,6 +10,8 @@ abstract class AuthService {
   Stream<UserModel?> get authStateChanges;
   Future<UserModel> signUp({required String email, required String password});
   Future<UserModel> signIn({required String email, required String password});
+  Future<UserModel> signInWithGoogle();
+  Future<void> sendPasswordResetEmail({required String email});
   Future<void> sendEmailVerification();
   Future<bool> checkEmailVerification();
   Future<void> signOut();
@@ -130,6 +133,60 @@ class FirebaseAuthService implements AuthService {
   }
 
   @override
+  Future<UserModel> signInWithGoogle() async {
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      throw Exception('Google Sign-In was cancelled.');
+    }
+
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final OAuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+    final user = userCredential.user!;
+    final normalizedEmail = (user.email ?? googleUser.email).toLowerCase().trim();
+
+    final userModel = UserModel(
+      uid: user.uid,
+      email: normalizedEmail,
+      displayName: user.displayName ?? googleUser.displayName ?? normalizedEmail.split('@').first,
+      isEmailVerified: user.emailVerified,
+      createdAt: user.metadata.creationTime ?? DateTime.now(),
+    );
+
+    // Self-healing: Ensure Firestore profile document exists in /users/{uid}
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(userModel.toMap(), SetOptions(merge: true));
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[FirebaseAuthService] Warning: Failed to upsert user profile in /users/${user.uid} during signInWithGoogle: $e\n$stackTrace',
+      );
+    }
+
+    return userModel;
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    final normalizedEmail = email.toLowerCase().trim();
+    if (normalizedEmail.isEmpty) {
+      throw Exception('Email address cannot be empty.');
+    }
+    try {
+      await _firebaseAuth.sendPasswordResetEmail(email: normalizedEmail);
+    } on FirebaseAuthException {
+      // Intentionally suppress specific auth exception to prevent user enumeration
+    }
+  }
+
+  @override
   Future<void> sendEmailVerification() async {
     final user = _firebaseAuth.currentUser;
     if (user != null && !user.emailVerified) {
@@ -209,6 +266,8 @@ class MockAuthService implements AuthService {
   UserModel? _currentUser;
   final Map<String, ({String password, UserModel user})> _users = {};
   bool _verificationSent = false;
+  String? _lastPasswordResetEmail;
+  String? get lastPasswordResetEmail => _lastPasswordResetEmail;
   final ChatRepository? chatRepository;
 
   MockAuthService({
@@ -284,6 +343,32 @@ class MockAuthService implements AuthService {
       repo.registerUser(entry.user);
     }
     return entry.user;
+  }
+
+  @override
+  Future<UserModel> signInWithGoogle() async {
+    final user = UserModel(
+      uid: 'mock_google_uid_${DateTime.now().millisecondsSinceEpoch}',
+      email: 'google_user@ozone.test',
+      displayName: 'GoogleUser',
+      isEmailVerified: true,
+      createdAt: DateTime.now(),
+    );
+    _currentUser = user;
+    final repo = chatRepository;
+    if (repo is MockChatRepository) {
+      repo.registerUser(user);
+    }
+    return user;
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    final normalized = email.toLowerCase().trim();
+    if (normalized.isEmpty || !normalized.contains('@')) {
+      throw Exception('Invalid email address format.');
+    }
+    _lastPasswordResetEmail = normalized;
   }
 
   @override

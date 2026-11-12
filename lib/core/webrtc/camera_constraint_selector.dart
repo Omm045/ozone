@@ -12,6 +12,78 @@ class CameraConstraintSelector {
   static const int standardFps = 30;
 
   static final Map<bool, int> _cachedCameraMaxFps = {};
+  static ({int width, int height, double aspectRatio})? _cachedFrontCameraNativeFormat;
+
+  static void setMockFrontCameraFormatForTesting({
+    required int width,
+    required int height,
+    double? aspectRatio,
+  }) {
+    _cachedFrontCameraNativeFormat = (
+      width: width,
+      height: height,
+      aspectRatio: aspectRatio ?? (height > 0 ? width / height : 16 / 9),
+    );
+  }
+
+  /// Probes the device's actual native front-camera sensor resolution and aspect ratio.
+  /// Queries track settings without fixed hardcoded 16:9 1080p constraints, so the sensor's
+  /// unconstrained natural output format is discovered.
+  static Future<({int width, int height, double aspectRatio})> queryNativeFrontCameraFormat({
+    dynamic mediaDevices,
+  }) async {
+    if (_cachedFrontCameraNativeFormat != null) {
+      return _cachedFrontCameraNativeFormat!;
+    }
+
+    try {
+      final probeConstraints = <String, dynamic>{
+        'audio': false,
+        'video': {
+          'facingMode': 'user',
+          'optional': <Map<String, dynamic>>[],
+        },
+      };
+
+      final MediaStream stream = mediaDevices != null
+          ? await (mediaDevices as dynamic).getUserMedia(probeConstraints)
+          : await navigator.mediaDevices.getUserMedia(probeConstraints);
+
+      final tracks = stream.getVideoTracks();
+      if (tracks.isNotEmpty) {
+        final track = tracks.first;
+        final settings = track.getSettings();
+        final rawWidth = (settings['width'] as num?)?.toInt();
+        final rawHeight = (settings['height'] as num?)?.toInt();
+        final rawAspect = (settings['aspectRatio'] as num?)?.toDouble();
+
+        await track.stop();
+        await stream.dispose();
+
+        if (rawWidth != null && rawHeight != null && rawWidth > 0 && rawHeight > 0) {
+          final aspect = rawAspect ?? (rawWidth / rawHeight);
+          final detected = (width: rawWidth, height: rawHeight, aspectRatio: aspect);
+          _cachedFrontCameraNativeFormat = detected;
+          debugPrint(
+            '[CameraConstraintSelector] Detected native front camera sensor: '
+            '${rawWidth}x$rawHeight (aspectRatio: ${aspect.toStringAsFixed(2)})',
+          );
+          return detected;
+        }
+      }
+      await stream.dispose();
+    } catch (e) {
+      debugPrint('[CameraConstraintSelector] Front camera probe note: $e');
+    }
+
+    const fallback = (
+      width: maxResolutionWidth,
+      height: maxResolutionHeight,
+      aspectRatio: 16 / 9,
+    );
+    _cachedFrontCameraNativeFormat = fallback;
+    return fallback;
+  }
 
   /// Queries the camera's supported capabilities at 1080p specifically
   /// to determine the actual maximum frame rate the device's sensor supports.
@@ -74,6 +146,7 @@ class CameraConstraintSelector {
 
   static void clearCacheForTesting() {
     _cachedCameraMaxFps.clear();
+    _cachedFrontCameraNativeFormat = null;
   }
 
   /// Builds media constraints matching the negotiated send resolution tier and call mode.
@@ -95,16 +168,83 @@ class CameraConstraintSelector {
       };
     }
 
-    final int targetWidth;
-    final int targetHeight;
+    // BACK CAMERA CODE PATH — 100% PRESERVED AND UNTOUCHED
+    if (!isFrontCamera) {
+      final int targetWidth;
+      final int targetHeight;
+
+      if (tier == ResolutionTier.p720) {
+        targetWidth = defaultResolutionWidth;
+        targetHeight = defaultResolutionHeight;
+      } else {
+        // Capped to 1920x1080 for 1080p, 1440p, and 4K tiers to protect hardware encoders
+        targetWidth = maxResolutionWidth;
+        targetHeight = maxResolutionHeight;
+      }
+
+      final cappedFps = maxFps.clamp(15, maxFpsLimit);
+      final optionalConstraints = <Map<String, dynamic>>[];
+      if (cappedFps >= 60) {
+        optionalConstraints.addAll([
+          {'minFrameRate': '60'},
+          {'maxFrameRate': '60'},
+        ]);
+      }
+
+      return {
+        'audio': audioConstraints,
+        'video': {
+          'mandatory': {
+            'minWidth': defaultResolutionWidth.toString(),
+            'minHeight': defaultResolutionHeight.toString(),
+            'maxWidth': targetWidth.toString(),
+            'maxHeight': targetHeight.toString(),
+            'minFrameRate': '15',
+            'maxFrameRate': cappedFps.toString(),
+          },
+          'facingMode': 'environment',
+          'optional': optionalConstraints,
+        },
+      };
+    }
+
+    // FRONT CAMERA ONLY: Query and use the device's native front-camera sensor resolution
+    // and aspect ratio as the starting point, avoiding forced cropping or stretching.
+    final nativeFormat = _cachedFrontCameraNativeFormat ??
+        const (
+          width: maxResolutionWidth,
+          height: maxResolutionHeight,
+          aspectRatio: 16 / 9,
+        );
+
+    final int frontTargetWidth;
+    final int frontTargetHeight;
+    final int frontMinWidth;
+    final int frontMinHeight;
+
+    final isLandscapeSensor = nativeFormat.aspectRatio >= 1.0;
 
     if (tier == ResolutionTier.p720) {
-      targetWidth = defaultResolutionWidth;
-      targetHeight = defaultResolutionHeight;
+      if (isLandscapeSensor) {
+        frontTargetHeight = 720;
+        frontTargetWidth = (720 * nativeFormat.aspectRatio).round().clamp(720, 1280);
+      } else {
+        frontTargetWidth = 720;
+        frontTargetHeight = (720 / nativeFormat.aspectRatio).round().clamp(720, 1280);
+      }
+      frontMinHeight = (frontTargetHeight * 0.75).round();
+      frontMinWidth = (frontTargetWidth * 0.75).round();
     } else {
-      // Capped to 1920x1080 for 1080p, 1440p, and 4K tiers to protect hardware encoders
-      targetWidth = maxResolutionWidth;
-      targetHeight = maxResolutionHeight;
+      // 1080p, 1440p, 4K tiers: use sensor native resolution capped at 1920x1080
+      if (isLandscapeSensor) {
+        frontTargetWidth = nativeFormat.width.clamp(1280, maxResolutionWidth);
+        frontTargetHeight = (frontTargetWidth / nativeFormat.aspectRatio).round().clamp(720, maxResolutionHeight);
+      } else {
+        frontTargetHeight = nativeFormat.height.clamp(1280, maxResolutionWidth);
+        frontTargetWidth = (frontTargetHeight * nativeFormat.aspectRatio).round().clamp(720, maxResolutionHeight);
+      }
+      frontMinWidth = (frontTargetWidth * 0.6).round();
+      frontMinHeight = (frontTargetHeight * 0.6).round();
     }
 
     final cappedFps = maxFps.clamp(15, maxFpsLimit);
@@ -120,14 +260,14 @@ class CameraConstraintSelector {
       'audio': audioConstraints,
       'video': {
         'mandatory': {
-          'minWidth': defaultResolutionWidth.toString(),
-          'minHeight': defaultResolutionHeight.toString(),
-          'maxWidth': targetWidth.toString(),
-          'maxHeight': targetHeight.toString(),
+          'minWidth': frontMinWidth.toString(),
+          'minHeight': frontMinHeight.toString(),
+          'maxWidth': frontTargetWidth.toString(),
+          'maxHeight': frontTargetHeight.toString(),
           'minFrameRate': '15',
           'maxFrameRate': cappedFps.toString(),
         },
-        'facingMode': isFrontCamera ? 'user' : 'environment',
+        'facingMode': 'user',
         'optional': optionalConstraints,
       },
     };

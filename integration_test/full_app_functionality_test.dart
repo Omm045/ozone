@@ -148,7 +148,6 @@ void main() {
       // Bottom floating control pill buttons
       expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
       expect(find.byIcon(Icons.flip_camera_ios_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.screen_share_rounded), findsOneWidget);
       expect(find.byIcon(Icons.speed_rounded), findsOneWidget);
       expect(find.byIcon(Icons.call_end_rounded), findsOneWidget);
 
@@ -173,20 +172,6 @@ void main() {
       // Tap footer to close modal
       await tester.tap(find.text('Updates every 2 seconds. Tap to close.'));
       await tester.pumpAndSettle();
-
-      // Test Screen Share & Hall of Mirrors Protection
-      await manager.startScreenShare();
-      await tester.pump();
-
-      if (manager.isScreenSharing) {
-        expect(find.text('You are sharing your screen'), findsOneWidget);
-        expect(find.text('Stop Sharing'), findsOneWidget);
-
-        // Tap Stop Sharing
-        await tester.tap(find.text('Stop Sharing'));
-        await tester.pump();
-        expect(manager.isScreenSharing, isFalse);
-      }
 
       manager.dispose();
     });

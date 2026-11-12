@@ -49,27 +49,46 @@ class _CallScreenState extends State<CallScreen> {
 
     _callManager = widget.callManager ?? WebRtcCallManager();
     _callManager.addListener(_onCallManagerChanged);
+    if (_callManager.status == CallStatus.connected) {
+      _startDurationTimer();
+    }
     _init1on1Call();
   }
 
   void _onCallManagerChanged() {
-    if (_callManager.status == CallStatus.connected && !_timerStarted) {
-      _startDurationTimer();
-    } else if (_callManager.status != CallStatus.connected && _timerStarted) {
-      _durationTimer?.cancel();
+    if (_callManager.status == CallStatus.connected) {
+      if (!_timerStarted) {
+        _startDurationTimer();
+      }
+    } else {
+      if (_timerStarted) {
+        _stopDurationTimer();
+      }
     }
   }
 
   void _startDurationTimer() {
     _timerStarted = true;
+    _callDurationSeconds = _callManager.callDurationSeconds;
     _durationTimer?.cancel();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() {
-          _callDurationSeconds++;
+          _callDurationSeconds = _callManager.callDurationSeconds;
         });
       }
     });
+  }
+
+  void _stopDurationTimer() {
+    _timerStarted = false;
+    _durationTimer?.cancel();
+    _durationTimer = null;
+    if (mounted) {
+      setState(() {
+        _callDurationSeconds = 0;
+      });
+    }
   }
 
   String _formatDuration(int totalSeconds) {
@@ -163,85 +182,9 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
-  Widget _buildScreenShareBanner() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        decoration: BoxDecoration(
-          color: OzoneTheme.surfaceCard.withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: OzoneTheme.cyan.withValues(alpha: 0.5), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: OzoneTheme.cyan.withValues(alpha: 0.15),
-              blurRadius: 30,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: OzoneTheme.cyan.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.screen_share_rounded,
-                size: 44,
-                color: OzoneTheme.cyan,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'You are sharing your screen',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: OzoneTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Other participants see your active display stream.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: OzoneTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: OzoneTheme.ruby,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                _callManager.stopScreenShare();
-              },
-              child: const Text(
-                'Stop Sharing',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildFloatingBottomControlBar() {
     final isMuted = _callManager.isMuted;
     final isCameraOff = _callManager.isVideoDisabled;
-    final isScreenSharing = _callManager.isScreenSharing;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -278,16 +221,6 @@ class _CallScreenState extends State<CallScreen> {
             ),
             tooltip: 'Switch Camera',
             onPressed: () => _callManager.switchCamera(),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(
-              isScreenSharing ? Icons.stop_screen_share_rounded : Icons.screen_share_rounded,
-              color: isScreenSharing ? OzoneTheme.cyan : Colors.white,
-              size: 24,
-            ),
-            tooltip: isScreenSharing ? 'Stop Screen Share' : 'Share Screen',
-            onPressed: () => _callManager.toggleScreenShare(),
           ),
           const SizedBox(width: 8),
           IconButton(
@@ -329,7 +262,13 @@ class _CallScreenState extends State<CallScreen> {
     final screenSize = MediaQuery.of(context).size;
     const pipWidth = 110.0;
     const pipHeight = 155.0;
-    _pipOffset ??= Offset(screenSize.width - pipWidth - 16, 68);
+    final defaultOffset = _pipOffset ?? Offset(screenSize.width - pipWidth - 16, 68);
+    final maxX = (screenSize.width - pipWidth - 8.0).clamp(8.0, double.infinity);
+    final maxY = (screenSize.height - pipHeight - 110.0).clamp(40.0, double.infinity);
+    _pipOffset = Offset(
+      defaultOffset.dx.clamp(8.0, maxX),
+      defaultOffset.dy.clamp(40.0, maxY),
+    );
 
     final Widget content = ListenableBuilder(
       listenable: _callManager,
@@ -365,23 +304,21 @@ class _CallScreenState extends State<CallScreen> {
             children: [
               if (isConnected && _isInitialized)
                 Positioned.fill(
-                  child: _callManager.isScreenSharing
-                      ? _buildScreenShareBanner()
-                      : GestureDetector(
-                          onDoubleTap: () {
-                            setState(() {
-                              _isCover = !_isCover;
-                            });
-                          },
-                          child: RepaintBoundary(
-                            child: RTCVideoView(
-                              _callManager.remoteRenderer,
-                              objectFit: _isCover
-                                  ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                                  : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                            ),
-                          ),
-                        ),
+                  child: GestureDetector(
+                    onDoubleTap: () {
+                      setState(() {
+                        _isCover = !_isCover;
+                      });
+                    },
+                    child: RepaintBoundary(
+                      child: RTCVideoView(
+                        _callManager.remoteRenderer,
+                        objectFit: _isCover
+                            ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+                            : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                      ),
+                    ),
+                  ),
                 )
               else
                 Positioned.fill(
@@ -469,28 +406,21 @@ class _CallScreenState extends State<CallScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
-                        child: _callManager.isScreenSharing
-                            ? RepaintBoundary(
-                                child: RTCVideoView(
-                                  _callManager.remoteRenderer,
-                                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        child: _callManager.isVideoDisabled
+                            ? const Center(
+                                child: Icon(
+                                  Icons.videocam_off_rounded,
+                                  color: Colors.white38,
+                                  size: 32,
                                 ),
                               )
-                            : (_callManager.isVideoDisabled
-                                ? const Center(
-                                    child: Icon(
-                                      Icons.videocam_off_rounded,
-                                      color: Colors.white38,
-                                      size: 32,
-                                    ),
-                                  )
-                                : RepaintBoundary(
-                                    child: RTCVideoView(
-                                      _callManager.localRenderer,
-                                      mirror: true,
-                                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                                    ),
-                                  )),
+                            : RepaintBoundary(
+                                child: RTCVideoView(
+                                  _callManager.localRenderer,
+                                  mirror: true,
+                                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                                ),
+                              ),
                       ),
                     ),
                   ),

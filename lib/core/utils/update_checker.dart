@@ -92,8 +92,8 @@ class UpdateChecker {
         final info = await PackageInfo.fromPlatform();
         currentVersion = normalizeVersion(info.version);
       } catch (e) {
-        debugPrint('[UpdateChecker] Error fetching PackageInfo: $e. Defaulting to 1.0.1');
-        currentVersion = '1.0.1';
+        debugPrint('[UpdateChecker] Error fetching PackageInfo: $e. Defaulting to 1.1.0');
+        currentVersion = '1.1.0';
       }
     }
 

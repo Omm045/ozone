@@ -68,7 +68,16 @@ class FirestoreChatRepository implements ChatRepository {
     final snapshot = await chatDoc.get();
 
     if (snapshot.exists && snapshot.data() != null) {
-      return ChatModel.fromMap(snapshot.data()!, snapshot.id);
+      final existingChat = ChatModel.fromMap(snapshot.data()!, snapshot.id);
+      if (existingChat.isHiddenFor(currentUser.uid)) {
+        await chatDoc.set({
+          'hiddenFor': FieldValue.arrayRemove([currentUser.uid]),
+        }, SetOptions(merge: true));
+        return existingChat.copyWith(
+          hiddenFor: existingChat.hiddenFor.where((u) => u != currentUser.uid).toList(),
+        );
+      }
+      return existingChat;
     }
 
     final newChat = ChatModel(
@@ -95,7 +104,16 @@ class FirestoreChatRepository implements ChatRepository {
     final snapshot = await chatDoc.get();
 
     if (snapshot.exists && snapshot.data() != null) {
-      return ChatModel.fromMap(snapshot.data()!, snapshot.id);
+      final existingChat = ChatModel.fromMap(snapshot.data()!, snapshot.id);
+      if (existingChat.isHiddenFor(currentUser.uid)) {
+        await chatDoc.set({
+          'hiddenFor': FieldValue.arrayRemove([currentUser.uid]),
+        }, SetOptions(merge: true));
+        return existingChat.copyWith(
+          hiddenFor: existingChat.hiddenFor.where((u) => u != currentUser.uid).toList(),
+        );
+      }
+      return existingChat;
     }
 
     final inviteChat = ChatModel(
@@ -173,6 +191,7 @@ class FirestoreChatRepository implements ChatRepository {
       'lastMessageText': trimmed,
       'lastMessageTimestamp': message.timestamp.toIso8601String(),
       'updatedAt': message.timestamp.toIso8601String(),
+      'hiddenFor': FieldValue.arrayRemove([currentUser.uid]),
     });
 
     await batch.commit();
@@ -215,8 +234,15 @@ class FirestoreChatRepository implements ChatRepository {
   @override
   Future<void> removeChat({required String chatId, required String userUid}) async {
     final docRef = _firestore.collection('chats').doc(chatId);
+    if (chatId.startsWith('invite_')) {
+      await docRef.delete().catchError((_) {});
+      return;
+    }
     final snapshot = await docRef.get();
-    if (!snapshot.exists || snapshot.data() == null) return;
+    if (!snapshot.exists || snapshot.data() == null) {
+      await docRef.delete().catchError((_) {});
+      return;
+    }
 
     final chat = ChatModel.fromMap(snapshot.data()!, snapshot.id);
     if (chat.isPendingInvite) {
@@ -224,9 +250,9 @@ class FirestoreChatRepository implements ChatRepository {
       await docRef.delete();
     } else {
       // Real contact chat: hide only for this user
-      await docRef.update({
+      await docRef.set({
         'hiddenFor': FieldValue.arrayUnion([userUid]),
-      });
+      }, SetOptions(merge: true));
     }
   }
 
@@ -335,6 +361,12 @@ class MockChatRepository implements ChatRepository {
 
     final chatId = ChatModel.deterministicChatId(currentUser.uid, targetUser.uid);
     if (_chats.containsKey(chatId)) {
+      final existing = _chats[chatId]!;
+      if (existing.isHiddenFor(currentUser.uid)) {
+        final updatedHidden = List<String>.from(existing.hiddenFor)..remove(currentUser.uid);
+        _chats[chatId] = existing.copyWith(hiddenFor: updatedHidden);
+        _emitChats();
+      }
       return _chats[chatId]!;
     }
 
@@ -427,13 +459,12 @@ class MockChatRepository implements ChatRepository {
 
     final existingChat = _chats[chatId];
     if (existingChat != null) {
-      _chats[chatId] = ChatModel(
-        id: existingChat.id,
-        participantUids: existingChat.participantUids,
-        participantEmails: existingChat.participantEmails,
+      final updatedHidden = List<String>.from(existingChat.hiddenFor)..remove(currentUser.uid);
+      _chats[chatId] = existingChat.copyWith(
         lastMessageText: trimmed,
         lastMessageTimestamp: message.timestamp,
         updatedAt: message.timestamp,
+        hiddenFor: updatedHidden,
       );
       _emitChats();
     }

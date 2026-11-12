@@ -19,7 +19,6 @@ class WebRtcCallManager extends ChangeNotifier {
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
-  MediaStream? _screenStream;
   RTCRtpSender? _videoSender;
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
@@ -45,7 +44,7 @@ class WebRtcCallManager extends ChangeNotifier {
   bool _isVideoDisabled = false;
   bool _isFrontCamera = true;
   bool _isSpeakerphoneOn = false;
-  bool _isScreenSharing = false;
+  DateTime? _connectedAt;
 
   Timer? _statsTimer;
   Timer? _connectionTimeoutTimer;
@@ -85,7 +84,11 @@ class WebRtcCallManager extends ChangeNotifier {
   bool get isMuted => _isMuted;
   bool get isVideoDisabled => _isVideoDisabled;
   bool get isSpeakerphoneOn => _isSpeakerphoneOn;
-  bool get isScreenSharing => _isScreenSharing;
+  DateTime? get connectedAt => _connectedAt;
+  int get callDurationSeconds {
+    if (_connectedAt == null || _status != CallStatus.connected) return 0;
+    return DateTime.now().difference(_connectedAt!).inSeconds;
+  }
   bool get isAudioOnly => _currentSession?.isAudioOnly ?? false;
   bool get isLocalNetworkDenied => _isLocalNetworkDenied;
   bool get hasGatheredHostCandidate => _hasGatheredHostCandidate;
@@ -193,7 +196,7 @@ class WebRtcCallManager extends ChangeNotifier {
     _sessionLogs.clear();
     _connectedPair = null;
     _lastAppliedTier = null;
-    _isScreenSharing = false;
+    _connectedAt = null;
 
     _log('Starting outgoing ${callType.name} call to ${callee.email}');
     notifyListeners();
@@ -316,7 +319,7 @@ class WebRtcCallManager extends ChangeNotifier {
     _sessionLogs.clear();
     _connectedPair = null;
     _lastAppliedTier = null;
-    _isScreenSharing = false;
+    _connectedAt = null;
 
     _log('Accepting incoming ${session.isAudioOnly ? "audio" : "video"} call ${session.id} from ${session.callerEmail}');
     notifyListeners();
@@ -437,6 +440,9 @@ class WebRtcCallManager extends ChangeNotifier {
 
     int nativeFps = 30;
     if (!isAudioOnly && !isSimulatorTestMode) {
+      if (_isFrontCamera) {
+        await CameraConstraintSelector.queryNativeFrontCameraFormat();
+      }
       nativeFps = await CameraConstraintSelector.queryNativeMaxFpsAt1080p(isFrontCamera: _isFrontCamera);
       _nativeMaxFps = nativeFps;
       qualityController.setNativeMaxFps(nativeFps);
@@ -640,6 +646,7 @@ class WebRtcCallManager extends ChangeNotifier {
     if (_status == CallStatus.connected) return;
     _log('Call successfully established and connected.');
     _connectionTimeoutTimer?.cancel();
+    _connectedAt = DateTime.now();
     _status = CallStatus.connected;
     _startStatsPolling();
     _logConnectedCandidatePair();
@@ -966,109 +973,6 @@ class WebRtcCallManager extends ChangeNotifier {
     }
   }
 
-  // --- Screen Sharing via RTCRtpSender.replaceTrack ---
-
-  Future<void> startScreenShare() async {
-    if (_isScreenSharing || _peerConnection == null) return;
-
-    try {
-      _log('Starting screen sharing via getDisplayMedia...');
-      final mediaConstraints = <String, dynamic>{
-        'audio': false,
-        'video': {
-          'mandatory': {
-            'minWidth': '1280',
-            'minHeight': '720',
-            'maxWidth': '1920',
-            'maxHeight': '1080',
-            'maxFrameRate': '30',
-          },
-        },
-      };
-
-      _screenStream = await navigator.mediaDevices.getDisplayMedia(mediaConstraints);
-      final screenVideoTrack = _screenStream?.getVideoTracks().firstOrNull;
-      if (screenVideoTrack == null) {
-        _log('No video track obtained from getDisplayMedia');
-        return;
-      }
-
-      screenVideoTrack.onEnded = () {
-        _log('Screen share track ended by OS');
-        stopScreenShare();
-      };
-
-      // Locate existing video sender without recreating PeerConnection
-      final senders = await _peerConnection!.getSenders();
-      RTCRtpSender? videoSender;
-      for (final s in senders) {
-        if (s == _videoSender || s.track?.kind == 'video') {
-          videoSender = s;
-          break;
-        }
-      }
-      videoSender ??= _videoSender;
-
-      if (videoSender != null) {
-        await videoSender.replaceTrack(screenVideoTrack);
-        _videoSender = videoSender;
-        _isScreenSharing = true;
-        _log('Seamlessly replaced video track with screen track via replaceTrack.');
-        notifyListeners();
-      } else {
-        _log('Warning: No video sender available to replaceTrack.');
-      }
-    } catch (e) {
-      _log('Failed to start screen share: $e');
-    }
-  }
-
-  Future<void> stopScreenShare() async {
-    if (!_isScreenSharing) return;
-
-    try {
-      _log('Stopping screen share and restoring camera track...');
-      _screenStream?.getTracks().forEach((t) {
-        try {
-          t.stop();
-        } catch (_) {}
-      });
-      await _screenStream?.dispose();
-      _screenStream = null;
-
-      final cameraVideoTrack = _localStream?.getVideoTracks().firstOrNull;
-
-      final senders = await _peerConnection?.getSenders() ?? [];
-      RTCRtpSender? videoSender;
-      for (final s in senders) {
-        if (s == _videoSender || s.track?.kind == 'video') {
-          videoSender = s;
-          break;
-        }
-      }
-      videoSender ??= _videoSender;
-
-      if (videoSender != null && cameraVideoTrack != null) {
-        await videoSender.replaceTrack(cameraVideoTrack);
-        _log('Restored camera track to video sender via replaceTrack.');
-      }
-
-      _isScreenSharing = false;
-      notifyListeners();
-    } catch (e) {
-      _log('Error stopping screen share: $e');
-      _isScreenSharing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> toggleScreenShare() async {
-    if (_isScreenSharing) {
-      await stopScreenShare();
-    } else {
-      await startScreenShare();
-    }
-  }
 
   void toggleMute() {
     _isMuted = !_isMuted;
@@ -1226,18 +1130,7 @@ class WebRtcCallManager extends ChangeNotifier {
 
     _remoteCandidateQueue.clear();
     _isRemoteDescriptionSet = false;
-
-    // Stop and dispose screen share tracks cleanly
-    _screenStream?.getTracks().forEach((t) {
-      try {
-        t.stop();
-      } catch (_) {}
-    });
-    try {
-      _screenStream?.dispose();
-    } catch (_) {}
-    _screenStream = null;
-    _isScreenSharing = false;
+    _connectedAt = null;
 
     // Clear renderers before closing tracks to prevent texture render exceptions
     try {

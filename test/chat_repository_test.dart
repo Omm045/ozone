@@ -163,5 +163,48 @@ void main() {
       expect(bobChats.any((c) => c.id == chat.id), isTrue);
       expect(bobChats.first.id, chat.id);
     });
+
+    test('BUG 2 Fix: Deleted chat stays hidden across subsequent getChatsStream emissions and incoming messages', () async {
+      final alice = UserModel(
+        uid: 'uid_alice',
+        email: 'alice@ozone.test',
+        createdAt: DateTime.now(),
+      );
+      final bob = UserModel(
+        uid: 'uid_bob',
+        email: 'bob@ozone.test',
+        createdAt: DateTime.now(),
+      );
+
+      final repo = MockChatRepository(initialUsers: [alice, bob]);
+      final chat = await repo.getOrCreateChat(bob, alice);
+
+      // Send initial message
+      await repo.sendMessage(chatId: chat.id, text: 'Hello', currentUser: alice);
+
+      // Alice deletes chat (Delete for me)
+      await repo.removeChat(chatId: chat.id, userUid: alice.uid);
+
+      // Assert Alice does not see it in immediate emission
+      var aliceChats = await repo.getChatsStream(alice.uid).first;
+      expect(aliceChats.any((c) => c.id == chat.id), isFalse);
+
+      // Bob sends a message — verify Alice's hidden status is NOT erased
+      await repo.sendMessage(chatId: chat.id, text: 'Are you there?', currentUser: bob);
+
+      // Subsequent emission for Alice still does NOT show the chat
+      aliceChats = await repo.getChatsStream(alice.uid).first;
+      expect(aliceChats.any((c) => c.id == chat.id), isFalse);
+
+      // Bob's stream still shows the chat with updated message
+      final bobChats = await repo.getChatsStream(bob.uid).first;
+      expect(bobChats.any((c) => c.id == chat.id), isTrue);
+      expect(bobChats.first.lastMessageText, 'Are you there?');
+
+      // If Alice explicitly re-connects via getOrCreateChat, it unhides for her
+      await repo.getOrCreateChat(bob, alice);
+      aliceChats = await repo.getChatsStream(alice.uid).first;
+      expect(aliceChats.any((c) => c.id == chat.id), isTrue);
+    });
   });
 }

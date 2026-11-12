@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:ozone/core/webrtc/adaptive_quality_controller.dart';
 import 'package:ozone/core/webrtc/camera_constraint_selector.dart';
 import 'package:ozone/core/webrtc/sdp_utils.dart';
@@ -57,9 +58,84 @@ void main() {
       expect(video720Mandatory['maxFrameRate'], '30');
     });
 
-    test('Screen Sharing state: isScreenSharing defaults to false', () {
+    test('Front camera quality uses native resolution and aspect ratio, while back camera is untouched', () {
+      CameraConstraintSelector.clearCacheForTesting();
+
+      // 1. Back camera check: must be 100% untouched
+      final backConstraints1080 = CameraConstraintSelector.getMediaConstraintsForTier(
+        ResolutionTier.p1080,
+        isFrontCamera: false,
+      );
+      final backVideo = backConstraints1080['video']['mandatory'] as Map<String, dynamic>;
+      expect(backVideo['maxWidth'], '1920');
+      expect(backVideo['maxHeight'], '1080');
+      expect(backVideo['minWidth'], '1280');
+      expect(backVideo['minHeight'], '720');
+      expect(backConstraints1080['video']['facingMode'], 'environment');
+
+      // 2. Front camera check with native 4:3 sensor (e.g. iPad or 1440x1080 front camera)
+      CameraConstraintSelector.setMockFrontCameraFormatForTesting(
+        width: 1440,
+        height: 1080,
+        aspectRatio: 1440 / 1080, // 4:3 = 1.333
+      );
+
+      final frontConstraints1080 = CameraConstraintSelector.getMediaConstraintsForTier(
+        ResolutionTier.p1080,
+        isFrontCamera: true,
+      );
+      final frontVideo = frontConstraints1080['video']['mandatory'] as Map<String, dynamic>;
+      expect(frontVideo['maxWidth'], '1440');
+      expect(frontVideo['maxHeight'], '1080');
+      expect(frontConstraints1080['video']['facingMode'], 'user');
+
+      // 3. Front camera check with portrait sensor (e.g. mobile 1080x1920)
+      CameraConstraintSelector.setMockFrontCameraFormatForTesting(
+        width: 1080,
+        height: 1920,
+        aspectRatio: 1080 / 1920, // 9:16 = 0.5625
+      );
+
+      final frontConstraintsPortrait = CameraConstraintSelector.getMediaConstraintsForTier(
+        ResolutionTier.p1080,
+        isFrontCamera: true,
+      );
+      final frontPortraitVideo = frontConstraintsPortrait['video']['mandatory'] as Map<String, dynamic>;
+      expect(frontPortraitVideo['maxHeight'], '1920');
+      expect(frontPortraitVideo['maxWidth'], '1080');
+      expect(frontConstraintsPortrait['video']['facingMode'], 'user');
+
+      CameraConstraintSelector.clearCacheForTesting();
+    });
+
+    test('Call duration timer starts at 00:00 on connection and resets for a new call', () async {
       final manager = WebRtcCallManager();
-      expect(manager.isScreenSharing, isFalse);
+      // Before connection: duration is 0
+      expect(manager.callDurationSeconds, 0);
+
+      // Simulate connection
+      manager.handleConnectionStateForTesting(RTCPeerConnectionState.RTCPeerConnectionStateConnected);
+      expect(manager.status, CallStatus.connected);
+      expect(manager.connectedAt, isNotNull);
+      expect(manager.callDurationSeconds, 0);
+
+      // Verify format 00:00
+      final minutes = (manager.callDurationSeconds ~/ 60).toString().padLeft(2, '0');
+      final seconds = (manager.callDurationSeconds % 60).toString().padLeft(2, '0');
+      expect('$minutes:$seconds', '00:00');
+
+      // End the call
+      await manager.endCall();
+      expect(manager.status, CallStatus.ended);
+      expect(manager.connectedAt, isNull);
+      expect(manager.callDurationSeconds, 0);
+
+      // Start a new call and connect again: duration resets to 00:00
+      manager.handleConnectionStateForTesting(RTCPeerConnectionState.RTCPeerConnectionStateConnected);
+      expect(manager.status, CallStatus.connected);
+      expect(manager.connectedAt, isNotNull);
+      expect(manager.callDurationSeconds, 0);
+
       manager.dispose();
     });
   });
@@ -137,15 +213,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Updates every 2 seconds. Tap to close.'), findsNothing);
-    });
-    testWidgets('CallScreen renders Hall of Mirrors protection banner when isScreenSharing is true', (tester) async {
-      final manager = WebRtcCallManager();
-      manager.setStatusForTesting(CallStatus.connected);
-
-      // Verify that when screen sharing is toggled on, banner is shown
-      expect(manager.isScreenSharing, isFalse);
-
-      manager.dispose();
     });
   });
 }

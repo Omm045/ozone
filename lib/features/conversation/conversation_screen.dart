@@ -183,7 +183,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.videocam_rounded, color: OzoneTheme.cyan, size: 26),
-            tooltip: 'Start Video Call (1080p -> 4K)',
+            tooltip: 'Start Video Call',
             onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.video),
           ),
         ],
@@ -192,9 +192,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
         children: [
           // Message Thread Stream
           Expanded(
-            child: StreamBuilder<List<ChatMessage>>(
-              stream: widget.chatRepository.getMessagesStream(widget.chat.id),
-              builder: (context, snapshot) {
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: StreamBuilder<List<ChatMessage>>(
+                  stream: widget.chatRepository.getMessagesStream(widget.chat.id),
+                  builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -347,38 +350,47 @@ class _ConversationScreenState extends State<ConversationScreen> {
               },
             ),
           ),
+        ),
+      ),
 
           // Message Input Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: const BoxDecoration(
               color: OzoneTheme.surface,
               border: Border(top: BorderSide(color: Colors.white10, width: 1)),
             ),
             child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _messageController,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              hintText: 'Type a message...',
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            onSubmitted: (_) => _sendMessage(),
+                          ),
                         ),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.send_rounded, color: OzoneTheme.cyan),
+                          tooltip: 'Send',
+                          onPressed: _sendMessage,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: OzoneTheme.cyan),
-                    tooltip: 'Send',
-                    onPressed: _sendMessage,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

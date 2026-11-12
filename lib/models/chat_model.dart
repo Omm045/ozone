@@ -17,7 +17,10 @@ class ChatModel {
     this.hiddenFor = const [],
   });
 
-  bool isHiddenFor(String uid) => hiddenFor.contains(uid);
+  bool isHiddenFor(String uid) {
+    final cleanUid = uid.trim();
+    return hiddenFor.any((h) => h.trim() == cleanUid);
+  }
 
   bool get isPendingInvite =>
       id.startsWith('invite_') || participantUids.contains('pending_invite');
