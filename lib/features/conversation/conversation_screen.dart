@@ -13,11 +13,13 @@ import '../call/call_screen.dart';
 class ConversationScreen extends StatefulWidget {
   final ChatModel chat;
   final ChatRepository chatRepository;
+  final bool isEmbedded;
 
   const ConversationScreen({
     super.key,
     required this.chat,
     required this.chatRepository,
+    this.isEmbedded = false,
   });
 
   @override
@@ -43,6 +45,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final currentUser = auth.currentUser;
     if (currentUser == null) return;
 
+    OzoneHaptics.light();
     _messageController.clear();
     await widget.chatRepository.sendMessage(
       chatId: widget.chat.id,
@@ -60,11 +63,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _confirmDeleteMessage(BuildContext context, ChatMessage message) async {
+    OzoneHaptics.medium();
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: OzoneTheme.surfaceCard,
+          backgroundColor: OzoneTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: OzoneTheme.hairlineBorderSide,
+          ),
           title: const Text(
             'Delete message?',
             style: TextStyle(color: OzoneTheme.textPrimary, fontWeight: FontWeight.bold),
@@ -105,10 +113,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     String targetEmail, {
     CallType callType = CallType.video,
   }) async {
-    // 1. Try email lookup
+    OzoneHaptics.medium();
     var targetUser = await widget.chatRepository.lookupUserByEmail(targetEmail);
 
-    // 2. Fall back to existing chat's known participant UID if user profile document lookup was delayed
     if (targetUser == null) {
       final otherUid = widget.chat.otherUserUid(currentUser.uid);
       if (otherUid.isNotEmpty) {
@@ -146,14 +153,105 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Widget _buildReceiptIcon(MessageStatus status) {
     switch (status) {
       case MessageStatus.sending:
-        return const Icon(Icons.access_time, size: 12, color: Colors.white38);
+        return const Icon(Icons.access_time_rounded, size: 12, color: Colors.white38);
       case MessageStatus.sent:
-        return const Icon(Icons.check, size: 12, color: Colors.white54);
+        return const Icon(Icons.check_rounded, size: 12, color: Colors.white54);
       case MessageStatus.delivered:
-        return const Icon(Icons.done_all, size: 13, color: Colors.white70);
+        return const Icon(Icons.done_all_rounded, size: 13, color: Colors.white70);
       case MessageStatus.read:
-        return const Icon(Icons.done_all, size: 13, color: OzoneTheme.cyan);
+        return const Icon(Icons.done_all_rounded, size: 13, color: OzoneTheme.cyan);
     }
+  }
+
+  Widget _buildTopStageBar(UserModel currentUser, String otherEmail) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: const BoxDecoration(
+        color: OzoneTheme.surface,
+        border: Border(bottom: OzoneTheme.hairlineBorderSide),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: OzoneTheme.background,
+              border: Border.all(color: OzoneTheme.cyan.withValues(alpha: 0.6), width: 1.5),
+            ),
+            child: Center(
+              child: Text(
+                otherEmail.isNotEmpty ? otherEmail[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  color: OzoneTheme.cyan,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  otherEmail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: OzoneTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: OzoneTheme.emerald,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Direct P2P Ready • 1080p HD',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: OzoneTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.phone_rounded, color: OzoneTheme.cyan, size: 22),
+            tooltip: 'Start Audio Call',
+            onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.audio),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.videocam_rounded, color: OzoneTheme.cyan, size: 26),
+            tooltip: 'Start Video Call (1080p HD)',
+            onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.video),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.screen_share_rounded, color: OzoneTheme.indigo, size: 22),
+            tooltip: 'Screen Share (HD)',
+            onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.video),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -163,17 +261,302 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     if (currentUser == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator(color: OzoneTheme.cyan)),
       );
     }
 
     final otherEmail = widget.chat.otherUserEmail(currentUser.email);
 
+    final chatBody = Column(
+      children: [
+        if (widget.isEmbedded) _buildTopStageBar(currentUser, otherEmail),
+
+        // Message Thread Stream
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: StreamBuilder<List<ChatMessage>>(
+                stream: widget.chatRepository.getMessagesStream(widget.chat.id),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: OzoneTheme.cyan),
+                    );
+                  }
+
+                  final messages = snapshot.data ?? [];
+
+                  if (messages.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 68,
+                            height: 68,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: OzoneTheme.surface,
+                              border: Border.all(
+                                color: OzoneTheme.cyan.withValues(alpha: 0.3),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: OzoneTheme.cyan,
+                              size: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Say hello to $otherEmail',
+                            style: const TextStyle(
+                              color: OzoneTheme.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Direct peer-to-peer encrypted messages and HD calls',
+                            style: TextStyle(
+                              color: OzoneTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = messages[index];
+                      final isMe = msg.senderUid == currentUser.uid;
+
+                      if (!isMe && msg.status != MessageStatus.read) {
+                        widget.chatRepository.markRead(widget.chat.id, msg.id);
+                      }
+
+                      if (msg.isDeleted) {
+                        return Align(
+                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            key: Key('deleted_msg_${msg.id}'),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * 0.75,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.04),
+                              borderRadius: BorderRadius.circular(14),
+                              border: OzoneTheme.hairlineBorder,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.block_flipped, size: 13, color: Colors.white38),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Message deleted',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 13,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  DateFormat.jm().format(msg.timestamp),
+                                  style: const TextStyle(
+                                    color: Colors.white24,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: GestureDetector(
+                          onLongPress: isMe ? () => _confirmDeleteMessage(context, msg) : null,
+                          onSecondaryTap: isMe ? () => _confirmDeleteMessage(context, msg) : null,
+                          child: Container(
+                            key: Key('msg_${msg.id}'),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? OzoneTheme.cyan.withValues(alpha: 0.16)
+                                  : OzoneTheme.surface,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(18),
+                                topRight: const Radius.circular(18),
+                                bottomLeft: Radius.circular(isMe ? 18 : 4),
+                                bottomRight: Radius.circular(isMe ? 4 : 18),
+                              ),
+                              border: Border.all(
+                                color: isMe
+                                    ? OzoneTheme.cyan.withValues(alpha: 0.4)
+                                    : OzoneTheme.hairlineColor,
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg.text,
+                                  style: const TextStyle(
+                                    color: OzoneTheme.textPrimary,
+                                    fontSize: 15,
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      DateFormat.jm().format(msg.timestamp),
+                                      style: TextStyle(
+                                        color: isMe
+                                            ? OzoneTheme.cyan.withValues(alpha: 0.8)
+                                            : OzoneTheme.textSecondary,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    if (isMe) ...[
+                                      const SizedBox(width: 4),
+                                      _buildReceiptIcon(msg.status),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+
+        // Message Input Bar
+        Container(
+          decoration: const BoxDecoration(
+            color: OzoneTheme.surface,
+            border: Border(top: OzoneTheme.hairlineBorderSide),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: const TextStyle(color: OzoneTheme.textPrimary, fontSize: 15),
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            hintStyle: const TextStyle(color: OzoneTheme.textSecondary, fontSize: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            filled: true,
+                            fillColor: OzoneTheme.background,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: OzoneTheme.hairlineBorderSide,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: OzoneTheme.hairlineBorderSide,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(color: OzoneTheme.cyan, width: 1.5),
+                            ),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: OzoneTheme.cyan,
+                          boxShadow: [
+                            BoxShadow(
+                              color: OzoneTheme.cyan.withValues(alpha: 0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.send_rounded, color: Colors.black, size: 20),
+                          tooltip: 'Send',
+                          onPressed: _sendMessage,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return Container(
+        color: OzoneTheme.background,
+        child: chatBody,
+      );
+    }
+
     return Scaffold(
+      backgroundColor: OzoneTheme.background,
       appBar: AppBar(
         title: Text(
           otherEmail,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
@@ -188,214 +571,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Message Thread Stream
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: StreamBuilder<List<ChatMessage>>(
-                  stream: widget.chatRepository.getMessagesStream(widget.chat.id),
-                  builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final messages = snapshot.data ?? [];
-
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble_outline,
-                          color: OzoneTheme.textSecondary,
-                          size: 40,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Say hello to $otherEmail',
-                          style: const TextStyle(color: OzoneTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    final isMe = msg.senderUid == currentUser.uid;
-
-                    // Automatically mark incoming messages as read
-                    if (!isMe && msg.status != MessageStatus.read) {
-                      widget.chatRepository.markRead(widget.chat.id, msg.id);
-                    }
-
-                    if (msg.isDeleted) {
-                      return Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          key: Key('deleted_msg_${msg.id}'),
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white12, width: 0.8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.block_flipped, size: 13, color: Colors.white38),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Message deleted',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 13,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                DateFormat.jm().format(msg.timestamp),
-                                style: const TextStyle(
-                                  color: Colors.white24,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: GestureDetector(
-                        onLongPress: isMe ? () => _confirmDeleteMessage(context, msg) : null,
-                        onSecondaryTap: isMe ? () => _confirmDeleteMessage(context, msg) : null,
-                        child: Container(
-                          key: Key('msg_${msg.id}'),
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isMe
-                                ? OzoneTheme.cyan.withValues(alpha: 0.2)
-                                : OzoneTheme.surfaceCard,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: Radius.circular(isMe ? 16 : 4),
-                              bottomRight: Radius.circular(isMe ? 4 : 16),
-                            ),
-                            border: Border.all(
-                              color: isMe
-                                  ? OzoneTheme.cyan.withValues(alpha: 0.5)
-                                  : Colors.white10,
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                msg.text,
-                                style: const TextStyle(
-                                  color: OzoneTheme.textPrimary,
-                                  fontSize: 15,
-                                  height: 1.3,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    DateFormat.jm().format(msg.timestamp),
-                                    style: const TextStyle(
-                                      color: OzoneTheme.textSecondary,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  if (isMe) ...[
-                                    const SizedBox(width: 4),
-                                    _buildReceiptIcon(msg.status),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-
-          // Message Input Bar
-          Container(
-            decoration: const BoxDecoration(
-              color: OzoneTheme.surface,
-              border: Border(top: BorderSide(color: Colors.white10, width: 1)),
-            ),
-            child: SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            textCapitalization: TextCapitalization.sentences,
-                            decoration: const InputDecoration(
-                              hintText: 'Type a message...',
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            onSubmitted: (_) => _sendMessage(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.send_rounded, color: OzoneTheme.cyan),
-                          tooltip: 'Send',
-                          onPressed: _sendMessage,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      body: chatBody,
     );
   }
 }

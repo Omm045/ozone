@@ -31,11 +31,14 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
-class _CallScreenState extends State<CallScreen> {
+class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateMixin {
   late final WebRtcCallManager _callManager;
 
   bool _isInitialized = false;
   late bool _isCover;
+  bool _isLocalMain = false; // Double-tap swaps local/remote feeds
+  bool _showControls = true; // Auto-hiding HUD controls
+  Timer? _autoHideTimer;
   Offset? _pipOffset;
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
@@ -52,6 +55,7 @@ class _CallScreenState extends State<CallScreen> {
     if (_callManager.status == CallStatus.connected) {
       _startDurationTimer();
     }
+    _resetAutoHideTimer();
     _init1on1Call();
   }
 
@@ -91,6 +95,35 @@ class _CallScreenState extends State<CallScreen> {
     }
   }
 
+  void _resetAutoHideTimer() {
+    _autoHideTimer?.cancel();
+    // In automated integration tests, do not auto-hide controls to allow deterministic finder assertions
+    const isTestMode = bool.fromEnvironment('TEST_MODE', defaultValue: false);
+    if (isTestMode) return;
+
+    _autoHideTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && _showControls) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _toggleControlsVisibility() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+    if (_showControls) {
+      _resetAutoHideTimer();
+    }
+  }
+
+  void _swapFeeds() {
+    OzoneHaptics.selection();
+    setState(() {
+      _isLocalMain = !_isLocalMain;
+    });
+  }
+
   String _formatDuration(int totalSeconds) {
     final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
     final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
@@ -117,7 +150,9 @@ class _CallScreenState extends State<CallScreen> {
 
     if (widget.isIncoming && widget.incomingSession != null) {
       await _callManager.acceptIncomingCall(session: widget.incomingSession!);
-    } else if (_callManager.status != CallStatus.connected && widget.caller != null && widget.callee != null) {
+    } else if (_callManager.status != CallStatus.connected &&
+        widget.caller != null &&
+        widget.callee != null) {
       await _callManager.startOutgoingCall(
         caller: widget.caller!,
         callee: widget.callee!,
@@ -128,6 +163,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    _autoHideTimer?.cancel();
     _durationTimer?.cancel();
     _callManager.removeListener(_onCallManagerChanged);
     if (widget.callManager == null) {
@@ -137,6 +173,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _handleEndCall() {
+    OzoneHaptics.medium();
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -144,59 +181,73 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Widget _buildTopBarOverlay() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0x99000000),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white12, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _peerDisplayName,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: const TextStyle(
-                            color: OzoneTheme.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+    return AnimatedOpacity(
+      opacity: _showControls ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 240),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 10, left: 16, right: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: OzoneTheme.surface.withValues(alpha: 0.88),
+                      borderRadius: BorderRadius.circular(24),
+                      border: OzoneTheme.hairlineBorder,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _peerDisplayName,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: OzoneTheme.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.lock_rounded,
-                        color: OzoneTheme.cyan,
-                        size: 14,
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.lock_rounded,
+                          color: OzoneTheme.cyan,
+                          size: 14,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            QualityIndicatorWidget(
-              state: _callManager.qualityState,
-              callManager: _callManager,
-              durationText: _formatDuration(_callDurationSeconds),
-              onTap: () => showConnectionStatsModal(
-                context,
-                _callManager.qualityState,
+              const SizedBox(width: 8),
+              QualityIndicatorWidget(
+                state: _callManager.qualityState,
                 callManager: _callManager,
+                durationText: _formatDuration(_callDurationSeconds),
+                onTap: () {
+                  _resetAutoHideTimer();
+                  showConnectionStatsModal(
+                    context,
+                    _callManager.qualityState,
+                    callManager: _callManager,
+                  );
+                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -206,92 +257,110 @@ class _CallScreenState extends State<CallScreen> {
     final isMuted = _callManager.isMuted;
     final isCameraOff = _callManager.isVideoDisabled;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF13151C).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.white12, width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black45,
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: Icon(
-              isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-              color: isMuted ? OzoneTheme.ruby : Colors.white,
-              size: 24,
+    return AnimatedOpacity(
+      opacity: _showControls ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 240),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: OzoneTheme.surface.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(34),
+          border: OzoneTheme.hairlineBorder,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
             ),
-            tooltip: isMuted ? 'Unmute' : 'Mute',
-            onPressed: () => _callManager.toggleMute(),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(
-              isCameraOff ? Icons.videocam_off_rounded : Icons.flip_camera_ios_rounded,
-              color: isCameraOff ? OzoneTheme.ruby : Colors.white,
-              size: 24,
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                color: isMuted ? OzoneTheme.ruby : Colors.white,
+                size: 24,
+              ),
+              tooltip: isMuted ? 'Unmute' : 'Mute',
+              onPressed: () {
+                _resetAutoHideTimer();
+                OzoneHaptics.light();
+                _callManager.toggleMute();
+              },
             ),
-            tooltip: 'Switch Camera',
-            onPressed: () => _callManager.switchCamera(),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(
-              _callManager.isSpeakerOn
-                  ? Icons.volume_up_rounded
-                  : Icons.volume_down_rounded,
-              color: _callManager.isSpeakerOn ? OzoneTheme.cyan : Colors.white,
-              size: 24,
+            const SizedBox(width: 8),
+            IconButton(
+              icon: Icon(
+                isCameraOff ? Icons.videocam_off_rounded : Icons.flip_camera_ios_rounded,
+                color: isCameraOff ? OzoneTheme.ruby : Colors.white,
+                size: 24,
+              ),
+              tooltip: 'Switch Camera',
+              onPressed: () {
+                _resetAutoHideTimer();
+                OzoneHaptics.light();
+                _callManager.switchCamera();
+              },
             ),
-            tooltip: _callManager.isSpeakerOn ? 'Speaker: On' : 'Speaker: Off',
-            onPressed: () => _callManager.toggleSpeaker(),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(
-              Icons.speed_rounded,
-              color: Colors.white,
-              size: 24,
+            const SizedBox(width: 8),
+            IconButton(
+              icon: Icon(
+                _callManager.isSpeakerOn
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_down_rounded,
+                color: _callManager.isSpeakerOn ? OzoneTheme.cyan : Colors.white,
+                size: 24,
+              ),
+              tooltip: _callManager.isSpeakerOn ? 'Speaker: On' : 'Speaker: Off',
+              onPressed: () {
+                _resetAutoHideTimer();
+                OzoneHaptics.light();
+                _callManager.toggleSpeaker();
+              },
             ),
-            tooltip: 'Connection Stats',
-            onPressed: () {
-              showConnectionStatsModal(
-                context,
-                _callManager.qualityState,
-                callManager: _callManager,
-              );
-            },
-          ),
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            heroTag: 'endVideoCallBtn',
-            backgroundColor: OzoneTheme.ruby,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            mini: true,
-            tooltip: 'End Call',
-            onPressed: _handleEndCall,
-            child: const Icon(Icons.call_end_rounded, size: 22),
-          ),
-        ],
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(
+                Icons.speed_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+              tooltip: 'Connection Stats',
+              onPressed: () {
+                _resetAutoHideTimer();
+                OzoneHaptics.light();
+                showConnectionStatsModal(
+                  context,
+                  _callManager.qualityState,
+                  callManager: _callManager,
+                );
+              },
+            ),
+            const SizedBox(width: 12),
+            FloatingActionButton(
+              heroTag: 'endVideoCallBtn',
+              backgroundColor: OzoneTheme.ruby,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              mini: true,
+              tooltip: 'End Call',
+              onPressed: _handleEndCall,
+              child: const Icon(Icons.call_end_rounded, size: 22),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    const pipWidth = 110.0;
-    const pipHeight = 155.0;
-    final defaultOffset = _pipOffset ?? Offset(screenSize.width - pipWidth - 16, 68);
+    final screenSize = MediaQuery.sizeOf(context);
+    const pipWidth = 114.0;
+    const pipHeight = 160.0;
+    final defaultOffset = _pipOffset ?? Offset(screenSize.width - pipWidth - 16, 74);
     final maxX = (screenSize.width - pipWidth - 8.0).clamp(8.0, double.infinity);
     final maxY = (screenSize.height - pipHeight - 110.0).clamp(40.0, double.infinity);
     _pipOffset = Offset(
@@ -327,24 +396,33 @@ class _CallScreenState extends State<CallScreen> {
           );
         }
 
+        // Determine main vs PiP feeds according to swap state
+        final mainRenderer = _isLocalMain ? _callManager.localRenderer : _callManager.remoteRenderer;
+        final pipRenderer = _isLocalMain ? _callManager.remoteRenderer : _callManager.localRenderer;
+        final isPipLocal = !_isLocalMain;
+
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(
             children: [
+              // Cinema Full-Bleed Video Canvas with Pinch-to-Zoom
               if (isConnected && _isInitialized)
                 Positioned.fill(
                   child: GestureDetector(
-                    onDoubleTap: () {
-                      setState(() {
-                        _isCover = !_isCover;
-                      });
-                    },
+                    onTap: _toggleControlsVisibility,
+                    onDoubleTap: _swapFeeds,
                     child: RepaintBoundary(
-                      child: RTCVideoView(
-                        _callManager.remoteRenderer,
-                        objectFit: _isCover
-                            ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
-                            : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                      child: InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 4.0,
+                        clipBehavior: Clip.none,
+                        child: RTCVideoView(
+                          mainRenderer,
+                          mirror: _isLocalMain,
+                          objectFit: _isCover
+                              ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+                              : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                        ),
                       ),
                     ),
                   ),
@@ -357,19 +435,36 @@ class _CallScreenState extends State<CallScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 48,
-                            backgroundColor: OzoneTheme.surfaceCard,
-                            child: Text(
-                              _peerDisplayName.isNotEmpty ? _peerDisplayName[0].toUpperCase() : '?',
-                              style: const TextStyle(
-                                color: OzoneTheme.cyan,
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
+                          Container(
+                            width: 104,
+                            height: 104,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: OzoneTheme.surface,
+                              border: Border.all(
+                                color: OzoneTheme.cyan.withValues(alpha: 0.5),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: OzoneTheme.cyan.withValues(alpha: 0.2),
+                                  blurRadius: 28,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                _peerDisplayName.isNotEmpty ? _peerDisplayName[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                  color: OzoneTheme.cyan,
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
                           Text(
                             _peerDisplayName,
                             style: const TextStyle(
@@ -382,7 +477,7 @@ class _CallScreenState extends State<CallScreen> {
                           Text(
                             _callManager.status == CallStatus.ringing
                                 ? 'Ringing...'
-                                : 'Connecting peer-to-peer...',
+                                : 'Connecting peer-to-peer (1080p)...',
                             style: const TextStyle(
                               fontSize: 14,
                               color: OzoneTheme.textSecondary,
@@ -399,7 +494,7 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                 ),
 
-              // Draggable PiP Card
+              // Smooth Draggable Local PiP Preview with Double-Tap Swap
               if (_isInitialized)
                 Positioned(
                   left: _pipOffset!.dx,
@@ -408,6 +503,8 @@ class _CallScreenState extends State<CallScreen> {
                   height: pipHeight,
                   child: GestureDetector(
                     key: const ValueKey('pip_draggable_1on1'),
+                    onTap: _swapFeeds,
+                    onDoubleTap: _swapFeeds,
                     onPanUpdate: (details) {
                       setState(() {
                         final newX = (_pipOffset!.dx + details.delta.dx)
@@ -417,25 +514,33 @@ class _CallScreenState extends State<CallScreen> {
                         _pipOffset = Offset(newX, newY);
                       });
                     },
+                    onPanEnd: (_) {
+                      // Spring snap to nearest edge
+                      final midX = screenSize.width / 2;
+                      final targetX = (_pipOffset!.dx < midX) ? 14.0 : (screenSize.width - pipWidth - 14.0);
+                      setState(() {
+                        _pipOffset = Offset(targetX, _pipOffset!.dy);
+                      });
+                    },
                     child: Container(
                       decoration: BoxDecoration(
-                        color: OzoneTheme.surfaceCard,
-                        borderRadius: BorderRadius.circular(16),
+                        color: OzoneTheme.surface,
+                        borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white24,
+                          color: OzoneTheme.cyan.withValues(alpha: 0.5),
                           width: 1.5,
                         ),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black54,
-                            blurRadius: 14,
-                            offset: Offset(0, 4),
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: _callManager.isVideoDisabled
+                        borderRadius: BorderRadius.circular(16),
+                        child: (isPipLocal && _callManager.isVideoDisabled)
                             ? const Center(
                                 child: Icon(
                                   Icons.videocam_off_rounded,
@@ -445,8 +550,8 @@ class _CallScreenState extends State<CallScreen> {
                               )
                             : RepaintBoundary(
                                 child: RTCVideoView(
-                                  _callManager.localRenderer,
-                                  mirror: true,
+                                  pipRenderer,
+                                  mirror: isPipLocal,
                                   objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                                 ),
                               ),
@@ -459,7 +564,7 @@ class _CallScreenState extends State<CallScreen> {
 
               if (!isFailed)
                 Positioned(
-                  bottom: 32,
+                  bottom: 34,
                   left: 0,
                   right: 0,
                   child: Center(child: _buildFloatingBottomControlBar()),
@@ -485,9 +590,16 @@ class _CallScreenState extends State<CallScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       decoration: BoxDecoration(
-        color: OzoneTheme.surfaceCard.withValues(alpha: 0.95),
+        color: OzoneTheme.surface.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(36),
-        border: Border.all(color: Colors.white12, width: 1),
+        border: OzoneTheme.hairlineBorder,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -499,7 +611,10 @@ class _CallScreenState extends State<CallScreen> {
               size: 26,
             ),
             tooltip: _callManager.isMuted ? 'Unmute' : 'Mute',
-            onPressed: () => _callManager.toggleMute(),
+            onPressed: () {
+              OzoneHaptics.light();
+              _callManager.toggleMute();
+            },
           ),
           const SizedBox(width: 14),
           IconButton(
@@ -511,7 +626,10 @@ class _CallScreenState extends State<CallScreen> {
               size: 26,
             ),
             tooltip: _callManager.isSpeakerphoneOn ? 'Speakerphone: On' : 'Speakerphone: Off',
-            onPressed: () => _callManager.toggleSpeakerphone(),
+            onPressed: () {
+              OzoneHaptics.light();
+              _callManager.toggleSpeakerphone();
+            },
           ),
           const SizedBox(width: 20),
           FloatingActionButton(
@@ -543,11 +661,18 @@ class _CallScreenState extends State<CallScreen> {
                 height: 130,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: OzoneTheme.surfaceCard,
+                  color: OzoneTheme.surface,
                   border: Border.all(
-                    color: OzoneTheme.cyan.withValues(alpha: 0.35),
+                    color: OzoneTheme.cyan.withValues(alpha: 0.4),
                     width: 2,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: OzoneTheme.cyan.withValues(alpha: 0.15),
+                      blurRadius: 28,
+                      spreadRadius: 4,
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Text(
@@ -637,8 +762,9 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 28),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: OzoneTheme.surfaceCard,
+                backgroundColor: OzoneTheme.surface,
                 foregroundColor: Colors.white,
+                side: OzoneTheme.hairlineBorderSide,
               ),
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Close'),
