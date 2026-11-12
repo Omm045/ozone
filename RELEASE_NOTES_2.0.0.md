@@ -54,7 +54,13 @@ This release focuses on making calls start, connect and end reliably.
 - **macOS:** download `ozone-macos-2.0.0.zip` and unzip it. The app isn't
   notarized, so the first time you open it, **right-click (or Control-click)
   the app and choose Open**, then confirm.
-- **iOS:** there is no ready-made iPhone download. Build it from source with
-  Flutter and Xcode.
+- **iOS:** download `ozone-ios-2.0.0-unsigned.ipa` and install it with
+  **AltStore** or **Sideloadly** using your own Apple ID, then trust your
+  developer certificate in Settings → General → VPN & Device Management.
+  Allow **Local Network**, Camera and Microphone when Ozone asks. With a free
+  Apple ID the app expires after **7 days** (re-install or refresh it) and you
+  can have at most **3** sideloaded apps. Google Sign-In may not work in a
+  sideloaded copy; email sign-in does. Building from source with Flutter and
+  Xcode is still possible.
 
 Existing installs on 1.x will see an update prompt for 2.0.0 at launch.

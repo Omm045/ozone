@@ -48,9 +48,21 @@ flutter run -d <iphone-device-id>              # iPhone (needs signing in Xcode)
 flutter run -d macos                           # Mac
 
 flutter build apk --release --split-per-abi    # Android (releases ship split APKs)
-flutter build ios --release                    # iOS (ipa via Xcode archive / signing)
 flutter build macos --release                  # macOS
 ```
+
+### iOS: unsigned IPA (no paid Apple account; never add signing identities or profiles to the repo or CI)
+```bash
+flutter config --no-enable-swift-package-manager   # SPM can't resolve firebase-ios-sdk + googlesignin-ios
+cd ios && pod install && cd ..
+flutter build ios --release --no-codesign            # no --dart-define: QA code stays compiled out
+mkdir -p Payload && cp -R build/ios/iphoneos/Runner.app Payload/ && zip -qry ozone-ios-<version>-unsigned.ipa Payload && rm -rf Payload
+```
+CI (`.github/workflows/release-ios-ipa.yml`) does the same on `macos-26` with Xcode 26.6 and Flutter 3.47.9.
+It decodes the gitignored Firebase config from the `FIREBASE_OPTIONS_DART_B64` and
+`IOS_GOOGLE_SERVICE_INFO_B64` secrets. Tag pushes (`v*`) attach the IPA to that release.
+A manual run (`gh workflow run release-ios-ipa.yml -f tag=vX.Y.Z -f attach=false`) only uploads an artifact.
+Users install the IPA with AltStore or Sideloadly (README, "Install on iPhone").
 iOS/macOS CocoaPods: `cd ios && pod install` / `cd macos && pod install` after changing plugins.
 
 ## Layout (lib/)

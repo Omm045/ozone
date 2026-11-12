@@ -188,20 +188,40 @@ This generates the following files locally:
 
 ---
 
-## iOS Installation & Sideloading (Free)
+## Install on iPhone
 
-For users installing the unsigned `.ipa` (`ozone-ios-v1.1.0.ipa`) via **Sideloadly** or **AltStore**:
+Ozone is not on the App Store. Each release includes an **unsigned** iPhone app
+(`ozone-ios-<version>-unsigned.ipa`) that you sign and install yourself with
+your own Apple ID.
 
-1. **Sideloadly**:
-   - Drag and drop `ozone-ios-v1.1.0.ipa` into Sideloadly.
-   - Enter your Apple ID and click **Start**.
-   - You can keep default settings, or under **Advanced Options**, you can optionally uncheck *"Use automatic bundle ID"* if you prefer to retain the exact `com.ozone.app.ozone` identifier.
-   - On your iOS device, navigate to **Settings → General → VPN & Device Management** and trust your Developer App certificate.
-2. **AltStore**:
-   - Open AltStore on your iOS device, tap **My Apps → +**, select `ozone-ios-v1.1.0.ipa`, and sign in with your Apple ID to install.
+1. Download `ozone-ios-<version>-unsigned.ipa` from the
+   [latest release](https://github.com/Omm045/ozone/releases/latest).
+2. Install it with **AltStore** or **Sideloadly** using your own Apple ID:
+   - **Sideloadly** (on a Mac or PC): connect the iPhone, drag the `.ipa` into
+     Sideloadly, enter your Apple ID and click **Start**.
+   - **AltStore**: in AltStore on the iPhone, tap **My Apps → +** and pick the
+     `.ipa`.
+3. On the iPhone, open **Settings → General → VPN & Device Management** and
+   trust your developer certificate (first install only). On recent iOS
+   versions you may also need to turn on **Developer Mode**.
+4. Open Ozone and allow **Local Network**, **Camera** and **Microphone** when
+   asked. Calls need Local Network access to connect directly to devices on
+   your Wi-Fi; if you tapped Don't Allow, enable it in
+   **Settings → Privacy & Security → Local Network**.
 
-> [!NOTE]
-> Sideloading with a free Apple Developer account dynamically attaches your Team ID to the app's bundle identifier (e.g. `com.ozone.app.ozone.<TEAM_ID>`). The app's URL schemes and Firebase configuration support both standard and dynamic sideloaded bundle identifiers.
+Limits of free Apple IDs:
+
+- The app **expires after 7 days** and must be re-installed or refreshed
+  (AltStore can refresh it automatically over Wi-Fi).
+- A free Apple ID can have at most **3 sideloaded apps** active at a time.
+- Sideloading usually changes the bundle identifier (for example
+  `com.ozone.app.ozone.<TEAM_ID>`). Email sign-in still works; **Google
+  Sign-In may not work** in a sideloaded copy.
+
+Building from source remains an option: install Flutter and Xcode, add your
+own Firebase configuration (`lib/firebase_options.dart` and
+`ios/Runner/GoogleService-Info.plist`, generated with `flutterfire configure`),
+then run `flutter run --release` with an iPhone connected.
 
 ---
 
