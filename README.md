@@ -1,5 +1,7 @@
 # Ozone
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+
 Ozone is a focused, high-performance cross-platform audio/video calling and 1:1 messaging application built in Flutter and Dart, targeting **iOS**, **macOS**, and **Android** from a single codebase.
 
 The centerpiece feature is an **adaptive-quality video calling engine** powered by WebRTC, starting at **1080p @ 30fps baseline** and stepping up to **1440p** and **4K** on sustained bandwidth headroom.
@@ -224,3 +226,10 @@ This is standard macOS security behavior for apps built with a free (non-paid) A
 - **Firebase Project ID**: `ozone-fc7f5`
 - The application connects to `ozone-fc7f5` when `firebase_options.dart` and platform GoogleService files are present.
 - If launched in an environment without configured Firebase credentials, the application can activate mock provider mode for offline UI and pipeline development.
+
+---
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) - see the [LICENSE](./LICENSE) file for details.
+
