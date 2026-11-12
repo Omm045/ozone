@@ -4,8 +4,8 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'adaptive_quality_controller.dart';
 
 class CameraConstraintSelector {
-  static const int maxResolutionWidth = 1920;
-  static const int maxResolutionHeight = 1080;
+  static const int maxResolutionWidth = 3840;
+  static const int maxResolutionHeight = 2160;
   static const int defaultResolutionWidth = 1280;
   static const int defaultResolutionHeight = 720;
   static const int maxFpsLimit = 60;
@@ -151,6 +151,57 @@ class CameraConstraintSelector {
     isIOSOverrideForTesting = null;
   }
 
+  /// Exposes high-fidelity audio constraints for callers.
+  static dynamic getAudioConstraints() => _getAudioConstraints();
+
+  /// Native W3C 1080p constraints for starting video calls with DSLR sharpness.
+  static Map<String, dynamic> get1080pConstraints({bool isFrontCamera = true}) {
+    return {
+      'width': {'ideal': 1920, 'max': 3840},
+      'height': {'ideal': 1080, 'max': 2160},
+      'frameRate': {'ideal': 30, 'max': 30},
+      'facingMode': isFrontCamera ? 'user' : 'environment',
+      'optional': <Map<String, dynamic>>[
+        {'focusMode': 'continuous'},
+        {'exposureMode': 'continuous'},
+        {'whiteBalanceMode': 'continuous'},
+      ],
+    };
+  }
+
+  /// Dynamic 4K upgrade constraints (used when network throughput > 8 Mbps, RTT < 25ms, and 0% loss).
+  static Map<String, dynamic> get4KUpgradeConstraints({bool isFrontCamera = true}) {
+    return {
+      'width': {'ideal': 3840, 'max': 3840},
+      'height': {'ideal': 2160, 'max': 2160},
+      'frameRate': {'ideal': 30, 'max': 30},
+      'facingMode': isFrontCamera ? 'user' : 'environment',
+      'optional': <Map<String, dynamic>>[
+        {'focusMode': 'continuous'},
+        {'exposureMode': 'continuous'},
+        {'whiteBalanceMode': 'continuous'},
+      ],
+    };
+  }
+
+  /// Graceful 720p fallback constraints if hardware cannot negotiate 1080p.
+  static Map<String, dynamic> get720pFallbackConstraints({bool isFrontCamera = true}) {
+    return {
+      'audio': _getAudioConstraints(),
+      'video': {
+        'facingMode': isFrontCamera ? 'user' : 'environment',
+        'width': {'ideal': 1280, 'max': 1920},
+        'height': {'ideal': 720, 'max': 1080},
+        'frameRate': {'ideal': 30, 'max': 30},
+        'optional': <Map<String, dynamic>>[
+          {'focusMode': 'continuous'},
+          {'exposureMode': 'continuous'},
+          {'whiteBalanceMode': 'continuous'},
+        ],
+      },
+    };
+  }
+
   /// Convenience wrapper to retrieve media constraints.
   static Map<String, dynamic> getMediaConstraints({
     ResolutionTier tier = ResolutionTier.p1080,
@@ -168,8 +219,7 @@ class CameraConstraintSelector {
 
   /// Builds media constraints matching the negotiated send resolution tier and call mode.
   /// When [isAudioOnly] is true, video is completely disabled ('video': false).
-  /// Passes explicit mandatory and optional constraints for 1080p / 720p HD capture,
-  /// including W3C dictionary constraints (width, height, frameRate) for macOS/iOS WebRTC.
+  /// Uses native W3C ideal/max dictionaries and continuous autofocus/exposure hints.
   static Map<String, dynamic> getMediaConstraintsForTier(
     ResolutionTier tier, {
     bool isFrontCamera = true,
@@ -188,6 +238,9 @@ class CameraConstraintSelector {
     final cappedFps = maxFps.clamp(15, maxFpsLimit);
 
     final optionalConstraints = <Map<String, dynamic>>[
+      {'focusMode': 'continuous'},
+      {'exposureMode': 'continuous'},
+      {'whiteBalanceMode': 'continuous'},
       {'minWidth': '1280'},
       {'minHeight': '720'},
       {'idealWidth': '1920'},
@@ -204,17 +257,44 @@ class CameraConstraintSelector {
 
     final bool isIOS = isIOSOverrideForTesting ?? (!kIsWeb && Platform.isIOS);
 
-    // On iOS, explicitly clamp camera capture to safe 1280x720 @ 30fps using simple,
-    // native-safe constraints without mandatory maps or minWidth/minHeight to prevent
-    // fatal AVCaptureSession SIGABRT format negotiation crashes.
+    // On iOS, strictly use native W3C ideal/max dictionaries without mandatory maps
+    // or minWidth/minHeight rejection keys to prevent AVCaptureSession SIGABRT format negotiation crashes.
     if (isIOS) {
+      final int idealWidth;
+      final int idealHeight;
+      final int maxWidth;
+      final int maxHeight;
+
+      if (tier >= ResolutionTier.p4k) {
+        idealWidth = 3840;
+        idealHeight = 2160;
+        maxWidth = 3840;
+        maxHeight = 2160;
+      } else if (tier == ResolutionTier.p720) {
+        idealWidth = 1280;
+        idealHeight = 720;
+        maxWidth = 1920;
+        maxHeight = 1080;
+      } else {
+        // Default 1080p start
+        idealWidth = 1920;
+        idealHeight = 1080;
+        maxWidth = 3840;
+        maxHeight = 2160;
+      }
+
       return {
         'audio': audioConstraints,
         'video': {
           'facingMode': isFrontCamera ? 'user' : 'environment',
-          'width': {'ideal': 1280},
-          'height': {'ideal': 720},
-          'frameRate': {'ideal': 30},
+          'width': {'ideal': idealWidth, 'max': maxWidth},
+          'height': {'ideal': idealHeight, 'max': maxHeight},
+          'frameRate': {'ideal': 30, 'max': cappedFps},
+          'optional': <Map<String, dynamic>>[
+            {'focusMode': 'continuous'},
+            {'exposureMode': 'continuous'},
+            {'whiteBalanceMode': 'continuous'},
+          ],
         },
       };
     }
@@ -227,10 +307,12 @@ class CameraConstraintSelector {
       if (tier == ResolutionTier.p720) {
         targetWidth = defaultResolutionWidth;
         targetHeight = defaultResolutionHeight;
+      } else if (tier >= ResolutionTier.p4k) {
+        targetWidth = 3840;
+        targetHeight = 2160;
       } else {
-        // Capped to 1920x1080 for 1080p, 1440p, and 4K tiers to protect hardware encoders
-        targetWidth = maxResolutionWidth;
-        targetHeight = maxResolutionHeight;
+        targetWidth = 1920;
+        targetHeight = 1080;
       }
 
       return {
@@ -294,13 +376,14 @@ class CameraConstraintSelector {
       frontMinHeight = (frontTargetHeight * 0.75).round();
       frontMinWidth = (frontTargetWidth * 0.75).round();
     } else {
-      // 1080p, 1440p, 4K tiers: use sensor native resolution capped at 1920x1080
+      final int maxCapWidth = tier >= ResolutionTier.p4k ? 3840 : 1920;
+      final int maxCapHeight = tier >= ResolutionTier.p4k ? 2160 : 1080;
       if (isLandscapeSensor) {
-        frontTargetWidth = nativeFormat.width.clamp(1280, maxResolutionWidth);
-        frontTargetHeight = (frontTargetWidth / nativeFormat.aspectRatio).round().clamp(720, maxResolutionHeight);
+        frontTargetWidth = nativeFormat.width.clamp(1280, maxCapWidth);
+        frontTargetHeight = (frontTargetWidth / nativeFormat.aspectRatio).round().clamp(720, maxCapHeight);
       } else {
-        frontTargetHeight = nativeFormat.height.clamp(1280, maxResolutionWidth);
-        frontTargetWidth = (frontTargetHeight * nativeFormat.aspectRatio).round().clamp(720, maxResolutionHeight);
+        frontTargetHeight = nativeFormat.height.clamp(1280, maxCapWidth);
+        frontTargetWidth = (frontTargetHeight * nativeFormat.aspectRatio).round().clamp(720, maxCapHeight);
       }
       frontMinWidth = (frontTargetWidth * 0.6).round();
       frontMinHeight = (frontTargetHeight * 0.6).round();

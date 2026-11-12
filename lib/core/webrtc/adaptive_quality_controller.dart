@@ -13,8 +13,8 @@ enum ResolutionTier {
     width: 1920,
     height: 1080,
     targetFps: 30,
-    targetBitrateBps: 5500000,
-    minHeadroomForStepUpBps: 9000000,
+    targetBitrateBps: 8000000,
+    minHeadroomForStepUpBps: 8000000,
     scaleResolutionDownBy: 1.0,
   ),
   p1440(
@@ -22,8 +22,8 @@ enum ResolutionTier {
     width: 2560,
     height: 1440,
     targetFps: 30,
-    targetBitrateBps: 10000000,
-    minHeadroomForStepUpBps: 18000000,
+    targetBitrateBps: 12000000,
+    minHeadroomForStepUpBps: 8000000,
     scaleResolutionDownBy: 1.0,
   ),
   p4k(
@@ -31,7 +31,7 @@ enum ResolutionTier {
     width: 3840,
     height: 2160,
     targetFps: 30,
-    targetBitrateBps: 20000000,
+    targetBitrateBps: 16000000,
     minHeadroomForStepUpBps: 999999999,
     scaleResolutionDownBy: 1.0,
   );
@@ -280,16 +280,15 @@ class AdaptiveQualityController {
   }
 
   /// Calculates the target bitrate for encoding parameters.
-  /// On Excellent networks (Direct P2P with < 20ms RTT), ensures maxBitrate is at least 6000000 bps.
+  /// 1080p target: 8 Mbps; 4K target: 16 Mbps; 720p floor: 2.5 Mbps.
   int getTargetBitrateBps({String routeType = 'Direct P2P', double? rttMs}) {
-    final rtt = rttMs ?? _lastSample?.roundTripTimeMs ?? 40.0;
-    final isDirectP2P = routeType.contains('Direct P2P') || routeType.contains('host');
-    if (_currentTier >= ResolutionTier.p1080 && isDirectP2P && rtt < 20.0) {
-      if (_currentTier.targetBitrateBps < 6000000) {
-        return 6000000;
-      }
+    if (_currentTier >= ResolutionTier.p4k) {
+      return 16000000;
     }
-    return _currentTier.targetBitrateBps;
+    if (_currentTier >= ResolutionTier.p1080) {
+      return 8000000;
+    }
+    return _currentTier.targetBitrateBps.clamp(2500000, 16000000);
   }
 
   void setManualTier(ResolutionTier? tier) {
@@ -406,7 +405,9 @@ class AdaptiveQualityController {
         reason: 'High RTT (${sample.roundTripTimeMs.toInt()}ms)',
       );
     }
-    final minBandwidth = _currentTier.targetBitrateBps * 0.85;
+    final double minBandwidth = _currentTier == ResolutionTier.p1080
+        ? 2500000
+        : _currentTier.targetBitrateBps * 0.70;
     if (sample.availableBandwidthBps < minBandwidth) {
       return (
         shouldStepDown: true,
@@ -421,8 +422,15 @@ class AdaptiveQualityController {
     if (sample.availableBandwidthBps < _currentTier.minHeadroomForStepUpBps) {
       return false;
     }
-    if (sample.roundTripTimeMs > 120.0) return false;
-    if (sample.packetLossRate > 0.015) return false;
+    // For 4K dynamic scale-up, require throughput > 8 Mbps, RTT < 25ms, and 0% packet loss
+    if (_currentTier >= ResolutionTier.p1440) {
+      if (sample.availableBandwidthBps < 8000000) return false;
+      if (sample.roundTripTimeMs >= 25.0) return false;
+      if (sample.packetLossRate > 0.001) return false;
+    } else {
+      if (sample.roundTripTimeMs > 120.0) return false;
+      if (sample.packetLossRate > 0.015) return false;
+    }
     if (sample.currentFps < 25) return false;
     return true;
   }

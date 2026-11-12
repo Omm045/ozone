@@ -143,10 +143,8 @@ class WebRtcCallManager extends ChangeNotifier {
 
   Future<void> loadSavedQualityPreference() async {
     final savedTier = await QualityPreferences.getSavedPreference();
-    final effectiveTier = (!kIsWeb && Platform.isIOS)
-        ? ResolutionTier.p720
-        : (savedTier ?? QualityPreferences.getDefaultStartingTier());
-    qualityController.setManualTier(savedTier == null ? null : effectiveTier);
+    final effectiveTier = savedTier ?? QualityPreferences.getDefaultStartingTier();
+    qualityController.setManualTier(savedTier);
     _applyEncodingParameters(effectiveTier);
     _qualityState = qualityController.getCurrentIndicatorState(telemetry: _latestTelemetry);
     notifyListeners();
@@ -203,11 +201,6 @@ class WebRtcCallManager extends ChangeNotifier {
     try {
       if (_currentSession != null) {
         _endCallInternal(status: CallStatus.ended);
-      }
-
-      // On iOS, hard clamp quality tier to max 720p regardless of user preference
-      if (!kIsWeb && Platform.isIOS) {
-        qualityController.setManualTier(ResolutionTier.p720);
       }
 
     _isCaller = true;
@@ -343,11 +336,6 @@ class WebRtcCallManager extends ChangeNotifier {
 
       // 1) Stop any ringtone/system sound first and settle audio session
       await Future.delayed(const Duration(milliseconds: 150));
-
-      // On iOS, hard clamp quality tier to max 720p regardless of user preference
-      if (!kIsWeb && Platform.isIOS) {
-        qualityController.setManualTier(ResolutionTier.p720);
-      }
 
     _isCaller = false;
     _currentSession = session;
@@ -494,26 +482,13 @@ class WebRtcCallManager extends ChangeNotifier {
       _log('Device camera native max FPS at 1080p: ${nativeFps}fps');
     }
 
-    // 1. Get User Media with safe resolution constraints
-    // On iOS, explicitly clamp to safe 1280x720 @ 30fps without mandatory maps or minWidth/minHeight
-    final mediaConstraints = (!kIsWeb && Platform.isIOS)
-        ? {
-            'audio': true,
-            'video': isAudioOnly
-                ? false
-                : {
-                    'facingMode': _isFrontCamera ? 'user' : 'environment',
-                    'width': {'ideal': 1280},
-                    'height': {'ideal': 720},
-                    'frameRate': {'ideal': 30},
-                  },
-          }
-        : CameraConstraintSelector.getMediaConstraintsForTier(
-            qualityController.currentTier,
-            isFrontCamera: _isFrontCamera,
-            isAudioOnly: isAudioOnly,
-            maxFps: nativeFps,
-          );
+    // 1. Get User Media with 1080p Full HD default constraints (and dynamic 4K support)
+    final mediaConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
+      qualityController.currentTier,
+      isFrontCamera: _isFrontCamera,
+      isAudioOnly: isAudioOnly,
+      maxFps: nativeFps,
+    );
 
     if (!kIsWeb && Platform.isIOS) {
       try {
@@ -537,18 +512,25 @@ class WebRtcCallManager extends ChangeNotifier {
     try {
       _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     } catch (e) {
-      _log('Initial getUserMedia note: $e');
+      _log('Initial 1080p getUserMedia note: $e');
       if (!isAudioOnly) {
-        _log('Retrying getUserMedia with safe standard camera constraints.');
+        _log('Retrying getUserMedia with graceful 720p fallback constraints.');
         try {
-          _localStream = await navigator.mediaDevices.getUserMedia({
-            'audio': true,
-            'video': {
-              'facingMode': _isFrontCamera ? 'user' : 'environment',
-            },
-          });
-        } catch (retryError) {
-          _log('Safe camera getUserMedia retry failed: $retryError');
+          _localStream = await navigator.mediaDevices.getUserMedia(
+            CameraConstraintSelector.get720pFallbackConstraints(isFrontCamera: _isFrontCamera),
+          );
+        } catch (retry720Error) {
+          _log('720p fallback failed: $retry720Error; trying standard basic constraints.');
+          try {
+            _localStream = await navigator.mediaDevices.getUserMedia({
+              'audio': true,
+              'video': {
+                'facingMode': _isFrontCamera ? 'user' : 'environment',
+              },
+            });
+          } catch (retryBasicError) {
+            _log('Safe camera basic retry failed: $retryBasicError');
+          }
         }
       }
       if (_localStream == null && (isSimulatorTestMode || Platform.isIOS || Platform.isMacOS)) {
@@ -1092,6 +1074,22 @@ class WebRtcCallManager extends ChangeNotifier {
       }
     } catch (e) {
       _log('Note: Error applying encoding parameters: $e');
+    }
+
+    // Dynamic 4K scale-up: upgrade local video track via applyConstraints when tier is 4K
+    if (tier >= ResolutionTier.p4k && _localStream != null) {
+      final videoTracks = _localStream!.getVideoTracks();
+      if (videoTracks.isNotEmpty) {
+        try {
+          final track = videoTracks.first;
+          track.applyConstraints(
+            CameraConstraintSelector.get4KUpgradeConstraints(isFrontCamera: _isFrontCamera),
+          );
+          _log('Upgraded local video track via applyConstraints to 4K (3840x2160 @ 30fps)');
+        } catch (e) {
+          _log('Dynamic 4K track applyConstraints note: $e');
+        }
+      }
     }
   }
 

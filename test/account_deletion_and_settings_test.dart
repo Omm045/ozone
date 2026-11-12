@@ -156,7 +156,7 @@ void main() {
 
     test('CameraConstraintSelector getEncodingParameters scales bitrate properly', () {
       final p1080Params = CameraConstraintSelector.getEncodingParameters(ResolutionTier.p1080);
-      expect(p1080Params['maxBitrate'], 5500000);
+      expect(p1080Params['maxBitrate'], 8000000);
       expect(p1080Params['scaleResolutionDownBy'], 1.0);
 
       final p720Params = CameraConstraintSelector.getEncodingParameters(ResolutionTier.p720);
@@ -164,7 +164,7 @@ void main() {
       expect(p720Params['scaleResolutionDownBy'], 1.5);
 
       final p4kParams = CameraConstraintSelector.getEncodingParameters(ResolutionTier.p4k);
-      expect(p4kParams['maxBitrate'], 20000000);
+      expect(p4kParams['maxBitrate'], 16000000);
       expect(p4kParams['scaleResolutionDownBy'], 1.0);
     });
   });

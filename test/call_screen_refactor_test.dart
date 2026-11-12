@@ -20,7 +20,7 @@ void main() {
       manager.dispose();
     });
 
-    test('SDP Munging: prefers VP9, Baseline H.264, and tunes Opus audio to 64kbps', () {
+    test('SDP Munging: prioritizes High-Profile H.264, Baseline H.264, VP8, and fast start bitrate', () {
       const sampleSdp =
           'v=0\r\n'
           'm=video 9 UDP/TLS/RTP/SAVPF 96 97 98 100\r\n'
@@ -34,19 +34,21 @@ void main() {
           'a=rtpmap:111 opus/48000/2\r\n';
 
       final munged = SdpUtils.optimizeSdp(sampleSdp);
-      // VP9 (100) and Baseline H264 (97) must precede High Profile H264 (96) and VP8 (98)
-      expect(munged, contains('m=video 9 UDP/TLS/RTP/SAVPF 100 97 96 98'));
+      // High-Profile H264 (96) and Baseline H264 (97) precede VP8 (98) and VP9 (100)
+      expect(munged, contains('m=video 9 UDP/TLS/RTP/SAVPF 96 97 98 100'));
+      // Video bitrate floor/ceiling hints injected
+      expect(munged, contains('x-google-min-bitrate=2500;x-google-start-bitrate=6000;x-google-max-bitrate=16000'));
       // Opus audio is tuned to 64kbps with FEC enabled
       expect(munged, contains('a=fmtp:111 minptime=10;useinbandfec=1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;cbr=1'));
     });
 
-    test('Camera constraints cap maximum resolution at 1920x1080 at 30fps and remove 4K constraints', () {
+    test('Camera constraints support true 1080p start and dynamic 4K tiering', () {
       final constraints4k = CameraConstraintSelector.getMediaConstraintsForTier(
         ResolutionTier.p4k,
       );
       final videoMandatory = constraints4k['video']['mandatory'] as Map<String, dynamic>;
-      expect(videoMandatory['maxWidth'], '1920');
-      expect(videoMandatory['maxHeight'], '1080');
+      expect(videoMandatory['maxWidth'], '3840');
+      expect(videoMandatory['maxHeight'], '2160');
       expect(videoMandatory['maxFrameRate'], '30');
 
       final constraints720 = CameraConstraintSelector.getMediaConstraintsForTier(
@@ -108,19 +110,29 @@ void main() {
       CameraConstraintSelector.clearCacheForTesting();
     });
 
-    test('iOS camera constraints strictly clamp to safe 1280x720 without mandatory maps or minWidth/minHeight', () {
+    test('iOS camera constraints use safe W3C 1080p start and 4K dynamic upgrade without mandatory maps', () {
       CameraConstraintSelector.isIOSOverrideForTesting = true;
-      final iosConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
-        ResolutionTier.p4k, // even if 4K is requested
+      final ios1080Constraints = CameraConstraintSelector.getMediaConstraintsForTier(
+        ResolutionTier.p1080,
         isFrontCamera: true,
       );
-      final video = iosConstraints['video'] as Map<String, dynamic>;
-      expect(video['facingMode'], 'user');
-      expect(video['width'], {'ideal': 1280});
-      expect(video['height'], {'ideal': 720});
-      expect(video['frameRate'], {'ideal': 30});
-      expect(video.containsKey('mandatory'), isFalse);
-      expect(video.containsKey('optional'), isFalse);
+      final video1080 = ios1080Constraints['video'] as Map<String, dynamic>;
+      expect(video1080['facingMode'], 'user');
+      expect(video1080['width'], {'ideal': 1920, 'max': 3840});
+      expect(video1080['height'], {'ideal': 1080, 'max': 2160});
+      expect(video1080['frameRate'], {'ideal': 30, 'max': 30});
+      expect(video1080.containsKey('mandatory'), isFalse);
+      final optional1080 = video1080['optional'] as List;
+      expect(optional1080.any((m) => m is Map && m['focusMode'] == 'continuous'), isTrue);
+
+      final ios4kConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
+        ResolutionTier.p4k,
+        isFrontCamera: true,
+      );
+      final video4k = ios4kConstraints['video'] as Map<String, dynamic>;
+      expect(video4k['width'], {'ideal': 3840, 'max': 3840});
+      expect(video4k['height'], {'ideal': 2160, 'max': 2160});
+      expect(video4k.containsKey('mandatory'), isFalse);
 
       CameraConstraintSelector.clearCacheForTesting();
     });

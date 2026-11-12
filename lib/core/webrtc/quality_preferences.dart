@@ -1,44 +1,24 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'adaptive_quality_controller.dart';
 
 class QualityPreferences {
   static const String _keyQualityPreference = 'ozone_quality_preference';
-  static bool? isMobileOverrideForTesting;
 
-  /// Returns the platform-appropriate default starting tier:
-  /// 720p HD (1280x720) on mobile (iOS/Android) for AVFoundation/hardware safety,
-  /// 1080p Full HD (1920x1080) on desktop.
+  /// Returns the default starting tier across ALL platforms (iOS, Android, and macOS):
+  /// Crisp 1080p Full HD (1920x1080 @ 30fps) by default.
   static ResolutionTier getDefaultStartingTier() {
-    final isMobile = isMobileOverrideForTesting ?? (!kIsWeb && (Platform.isIOS || Platform.isAndroid));
-    if (isMobile) {
-      return ResolutionTier.p720;
-    }
     return ResolutionTier.p1080;
   }
 
-  /// Loads saved preference: null means Auto (default), otherwise a fixed ResolutionTier.
-  /// On mobile, clamps to safe tiers (max 720p on iOS, 1080p on Android) even if 4K was previously saved.
+  /// Loads saved preference: null means Auto (1080p -> 4K Adaptive), otherwise a fixed ResolutionTier.
+  /// Allows all tiers (720p, 1080p, 1440p, 4K) across all platforms.
   static Future<ResolutionTier?> getSavedPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final val = prefs.getString(_keyQualityPreference);
       if (val == null || val == 'auto') return null;
       for (final tier in ResolutionTier.values) {
-        if (tier.name == val) {
-          final isMobile = isMobileOverrideForTesting ?? (!kIsWeb && (Platform.isIOS || Platform.isAndroid));
-          if (isMobile) {
-            final isIOS = !kIsWeb && Platform.isIOS;
-            if (isIOS && tier != ResolutionTier.p720) {
-              return ResolutionTier.p720;
-            }
-            if (tier == ResolutionTier.p4k || tier == ResolutionTier.p1440) {
-              return ResolutionTier.p720;
-            }
-          }
-          return tier;
-        }
+        if (tier.name == val) return tier;
       }
       return null;
     } catch (_) {
@@ -46,7 +26,7 @@ class QualityPreferences {
     }
   }
 
-  /// Saves preference: null means Auto, otherwise tier.name (e.g. '720p', '1080p').
+  /// Saves preference: null means Auto, otherwise tier.name (e.g. '1080p', '4K').
   static Future<void> savePreference(ResolutionTier? tier) async {
     try {
       final prefs = await SharedPreferences.getInstance();

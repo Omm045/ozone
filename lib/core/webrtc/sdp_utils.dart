@@ -1,9 +1,10 @@
 class SdpUtils {
   /// Munges SDP to optimize video and audio codec negotiation for high-end P2P calls:
-  /// 1. Video: Prioritizes VP9 (superior compression efficiency), followed by
-  ///    Baseline/Constrained-Baseline H.264 (broad hardware acceleration across Apple
-  ///    VideoToolbox and Android MediaCodec without High Profile freeze bugs),
-  ///    then Main/High H.264, then VP8 fallback.
+  /// 1. Video: Prioritizes High-Profile H.264 (profile-level-id=640032 / 6400 for 1080p/4K
+  ///    Apple VideoToolbox and Android MediaCodec hardware encoding), followed by
+  ///    Constrained-Baseline H.264 (42e01f / 4200), VP8, and VP9 as fallbacks.
+  ///    Appends x-google-min-bitrate=2500;x-google-start-bitrate=6000;x-google-max-bitrate=16000
+  ///    to video a=fmtp lines so video starts sharp on frame 1 without ramping slowly.
   /// 2. Audio: Tunes Opus to 64 kbps (crystal clear voice), enables in-band FEC
   ///    for packet loss resilience, and sets mono CBR for bandwidth efficiency.
   static String preferCompatibleVideoCodecs(String sdp) {
@@ -43,39 +44,64 @@ class SdpUtils {
       }
     }
 
-    final vp9Pts = <String>[];
+    final highH264Pts = <String>[];
     final baselineH264Pts = <String>[];
     final otherH264Pts = <String>[];
     final vp8Pts = <String>[];
+    final vp9Pts = <String>[];
     final otherPts = <String>[];
 
     for (final pt in payloadTypes) {
       final codec = ptToCodec[pt];
-      if (codec == 'VP9') {
-        vp9Pts.add(pt);
-      } else if (codec == 'H264') {
+      if (codec == 'H264') {
         final fmtp = ptToFmtp[pt] ?? '';
-        // Baseline / Constrained-Baseline profile starts with 42 (e.g. 42001f, 42e01f)
-        if (fmtp.contains('profile-level-id=42')) {
+        // High Profile H.264 starts with 6400 (e.g. 640032, 64002a)
+        if (fmtp.contains('profile-level-id=6400')) {
+          highH264Pts.add(pt);
+        } else if (fmtp.contains('profile-level-id=42')) {
           baselineH264Pts.add(pt);
         } else {
           otherH264Pts.add(pt);
         }
       } else if (codec == 'VP8') {
         vp8Pts.add(pt);
+      } else if (codec == 'VP9') {
+        vp9Pts.add(pt);
       } else {
         otherPts.add(pt);
       }
     }
 
     final reordered = [
-      ...vp9Pts,
+      ...highH264Pts,
       ...baselineH264Pts,
       ...otherH264Pts,
       ...vp8Pts,
+      ...vp9Pts,
       ...otherPts,
     ];
     lines[mVideoIndex] = '${header.join(' ')} ${reordered.join(' ')}';
+
+    // Inject Google WebRTC bitrate parameters on video fmtp lines so video starts sharp on frame 1
+    const bitrateParams = 'x-google-min-bitrate=2500;x-google-start-bitrate=6000;x-google-max-bitrate=16000';
+    final videoPts = [...highH264Pts, ...baselineH264Pts, ...otherH264Pts, ...vp8Pts, ...vp9Pts];
+
+    for (final pt in videoPts) {
+      final fmtpPrefix = 'a=fmtp:$pt ';
+      final fmtpIdx = lines.indexWhere((l) => l.startsWith(fmtpPrefix));
+      if (fmtpIdx != -1) {
+        final existing = lines[fmtpIdx];
+        if (!existing.contains('x-google-min-bitrate')) {
+          lines[fmtpIdx] = '$existing;$bitrateParams';
+        }
+      } else {
+        final rtpmapIdx = lines.indexWhere((l) => l.startsWith('a=rtpmap:$pt '));
+        if (rtpmapIdx != -1) {
+          lines.insert(rtpmapIdx + 1, '$fmtpPrefix$bitrateParams');
+        }
+      }
+    }
+
     return lines.join(newline);
   }
 
