@@ -1,0 +1,48 @@
+name: Release iOS Unsigned IPA
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release-ipa:
+    name: Build & Attach Unsigned iOS IPA
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          cd ios && pod install && cd ..
+
+      - name: Build unsigned iOS release bundle
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Payload into Unsigned IPA
+        run: |
+          mkdir -p build/ios/ipa_payload/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa_payload/Payload/
+          cd build/ios/ipa_payload
+          zip -r ../../ozone-ios-${{ github.ref_name }}.ipa Payload
+          cd ../../..
+          rm -rf build/ios/ipa_payload
+          ls -lh build/ozone-ios-${{ github.ref_name }}.ipa
+
+      - name: Upload IPA to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/ozone-ios-${{ github.ref_name }}.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
