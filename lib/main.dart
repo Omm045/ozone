@@ -76,6 +76,12 @@ class RootGate extends StatelessWidget {
 
     switch (auth.status) {
       case AuthStatus.loading:
+        // While signed out, loading means a sign-in/sign-up/Google request is
+        // in flight: keep the same AuthScreen element (it shows its own
+        // progress) so the typed email, password and mode survive an error.
+        if (auth.currentUser == null) {
+          return const AuthScreen();
+        }
         return const Scaffold(
           body: Center(
             child: CircularProgressIndicator(color: OzoneTheme.cyan),

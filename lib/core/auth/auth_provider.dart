@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../../models/user_model.dart';
 import '../database/chat_repository.dart';
@@ -16,6 +18,7 @@ class OzoneAuthProvider extends ChangeNotifier {
   UserModel? _currentUser;
   AuthStatus _status = AuthStatus.loading;
   String? _errorMessage;
+  StreamSubscription<UserModel?>? _authSub;
 
   OzoneAuthProvider({required AuthService authService})
       // ignore: prefer_initializing_formals
@@ -40,7 +43,7 @@ class OzoneAuthProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    _authService.authStateChanges.listen((user) {
+    _authSub = _authService.authStateChanges.listen((user) {
       _currentUser = user;
       if (user == null) {
         _status = AuthStatus.unauthenticated;
@@ -192,6 +195,13 @@ class OzoneAuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    _authSub = null;
+    super.dispose();
   }
 
   void clearError() {

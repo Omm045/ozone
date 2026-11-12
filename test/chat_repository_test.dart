@@ -164,7 +164,7 @@ void main() {
       expect(bobChats.first.id, chat.id);
     });
 
-    test('BUG 2 Fix: Deleted chat stays hidden across subsequent getChatsStream emissions and incoming messages', () async {
+    test('Deleted chat stays hidden across emissions until the peer sends a new message', () async {
       final alice = UserModel(
         uid: 'uid_alice',
         email: 'alice@ozone.test',
@@ -189,12 +189,15 @@ void main() {
       var aliceChats = await repo.getChatsStream(alice.uid).first;
       expect(aliceChats.any((c) => c.id == chat.id), isFalse);
 
-      // Bob sends a message — verify Alice's hidden status is NOT erased
-      await repo.sendMessage(chatId: chat.id, text: 'Are you there?', currentUser: bob);
-
       // Subsequent emission for Alice still does NOT show the chat
       aliceChats = await repo.getChatsStream(alice.uid).first;
       expect(aliceChats.any((c) => c.id == chat.id), isFalse);
+
+      // Bob sends a new message: the chat must reappear for Alice, otherwise
+      // Bob's message is silently invisible to her (owner-specified behavior).
+      await repo.sendMessage(chatId: chat.id, text: 'Are you there?', currentUser: bob);
+      aliceChats = await repo.getChatsStream(alice.uid).first;
+      expect(aliceChats.any((c) => c.id == chat.id), isTrue);
 
       // Bob's stream still shows the chat with updated message
       final bobChats = await repo.getChatsStream(bob.uid).first;

@@ -99,6 +99,17 @@ class CameraConstraintSelector {
       return _cachedCameraMaxFps[isFrontCamera]!;
     }
 
+    // iOS front camera: never open the camera with a 55-60 fps mandatory
+    // request. flutter_webrtc applies it via setActiveVideoMaxFrameDuration
+    // inside a dispatch_sync; on an unsupported duration AVFoundation throws
+    // and the app aborts (SIGABRT) at video-call start (real iPhone 17,
+    // iOS 27.2; also in v1.5.0). Capture is capped at 30 fps on iOS anyway.
+    final bool isIOS = isIOSOverrideForTesting ?? (!kIsWeb && Platform.isIOS);
+    if (isIOS && isFrontCamera) {
+      _cachedCameraMaxFps[isFrontCamera] = standardFps;
+      return standardFps;
+    }
+
     try {
       final testConstraints = <String, dynamic>{
         'audio': false,
@@ -271,6 +282,26 @@ class CameraConstraintSelector {
     // onto crisp 1080p @ 30fps instead of falling back to 640x480 @ 20fps.
     if (isMacOS) {
       final facing = isFrontCamera ? 'user' : 'environment';
+      if (isFrontCamera) {
+        // flutter_webrtc's Darwin capturer (FlutterRTCMediaStream.m
+        // getConstrainInt) only reads {'ideal': ...} when it is a STRING. Int
+        // ideals were ignored, so it picked the format closest to 0x0
+        // (640x480) at frameRate 0. String ideals select 1920x1080 @ 30.
+        return {
+          'audio': audioConstraints,
+          'video': {
+            'facingMode': facing,
+            'width': {'ideal': '1920', 'max': 1920},
+            'height': {'ideal': '1080', 'max': 1080},
+            'frameRate': {'ideal': '30', 'max': 30},
+            'optional': <Map<String, dynamic>>[
+              {'focusMode': 'continuous'},
+              {'exposureMode': 'continuous'},
+              {'whiteBalanceMode': 'continuous'},
+            ],
+          },
+        };
+      }
       return {
         'audio': audioConstraints,
         'video': {

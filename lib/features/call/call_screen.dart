@@ -43,6 +43,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
   bool _timerStarted = false;
+  bool _isClosing = false; // Guards against popping this route twice.
 
   @override
   void initState() {
@@ -60,6 +61,9 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   }
 
   void _onCallManagerChanged() {
+    if (_callManager.status == CallStatus.ended) {
+      _closeCallRoute();
+    }
     if (_callManager.status == CallStatus.connected) {
       if (!_timerStarted) {
         _startDurationTimer();
@@ -172,11 +176,23 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  /// Leaves the call screen exactly once: on local hangup, or when the remote
+  /// side ends the call. Dismisses anything stacked above this route first
+  /// (e.g. the stats sheet) so the pop removes the call screen itself.
+  void _closeCallRoute() {
+    if (_isClosing || !mounted) return;
+    _isClosing = true;
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      navigator.popUntil((r) => r == route);
+    }
+    navigator.pop();
+  }
+
   void _handleEndCall() {
     OzoneHaptics.medium();
-    if (mounted) {
-      Navigator.of(context).pop();
-    }
+    _closeCallRoute();
     unawaited(_callManager.endCall());
   }
 

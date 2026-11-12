@@ -56,9 +56,11 @@ void main() {
       );
 
       final video = macConstraints['video'] as Map<String, dynamic>;
-      expect(video['width'], {'ideal': 1920, 'max': 1920});
-      expect(video['height'], {'ideal': 1080, 'max': 1080});
-      expect(video['frameRate'], {'ideal': 30, 'max': 30});
+      // String ideals: the Darwin capturer ignores numeric ideals (it then
+      // selected 640x480 @ 0 fps on a real MacBook Air; QA audit).
+      expect(video['width'], {'ideal': '1920', 'max': 1920});
+      expect(video['height'], {'ideal': '1080', 'max': 1080});
+      expect(video['frameRate'], {'ideal': '30', 'max': 30});
       expect(video.containsKey('mandatory'), isFalse);
     });
 

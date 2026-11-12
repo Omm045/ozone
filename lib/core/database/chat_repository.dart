@@ -191,7 +191,9 @@ class FirestoreChatRepository implements ChatRepository {
       'lastMessageText': trimmed,
       'lastMessageTimestamp': message.timestamp.toIso8601String(),
       'updatedAt': message.timestamp.toIso8601String(),
-      'hiddenFor': FieldValue.arrayRemove([currentUser.uid]),
+      // A new message un-hides the chat for every participant, so a chat
+      // someone deleted "for me" reappears when the other person writes.
+      'hiddenFor': <String>[],
     });
 
     await batch.commit();
@@ -459,7 +461,8 @@ class MockChatRepository implements ChatRepository {
 
     final existingChat = _chats[chatId];
     if (existingChat != null) {
-      final updatedHidden = List<String>.from(existingChat.hiddenFor)..remove(currentUser.uid);
+      // Mirrors Firestore: a new message un-hides the chat for everyone.
+      const updatedHidden = <String>[];
       _chats[chatId] = existingChat.copyWith(
         lastMessageText: trimmed,
         lastMessageTimestamp: message.timestamp,

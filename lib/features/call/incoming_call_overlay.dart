@@ -7,7 +7,6 @@ import '../../core/database/chat_repository.dart';
 import '../../models/call_session.dart';
 import '../../models/user_model.dart';
 import '../../design_system/ozone_theme.dart';
-import '../../core/webrtc/webrtc_call_manager.dart';
 import 'call_screen.dart';
 import '../../main.dart';
 
@@ -78,10 +77,8 @@ class _IncomingCallOverlayManagerState
     setState(() => _currentIncomingCall = null);
 
     try {
-      // Delay Navigator.push until initializeRenderers() has completed
-      final callManager = context.read<WebRtcCallManager>();
-      await callManager.initializeRenderers();
-
+      // CallScreen owns its WebRtcCallManager and initializes its renderers in
+      // _init1on1Call; no manager is provided above this widget.
       await OzoneApp.navigatorKey.currentState?.push(
         MaterialPageRoute(
           builder: (_) => CallScreen(

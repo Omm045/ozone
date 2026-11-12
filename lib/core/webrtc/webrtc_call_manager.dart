@@ -10,6 +10,7 @@ import 'adaptive_quality_controller.dart';
 import 'camera_constraint_selector.dart';
 import 'quality_preferences.dart';
 import 'sdp_utils.dart';
+import '../qa/qa_instrumentation.dart';
 
 class WebRtcCallManager extends ChangeNotifier {
   final FirebaseFirestore? _customFirestore;
@@ -65,6 +66,8 @@ class WebRtcCallManager extends ChangeNotifier {
   String _activeCodec = 'VP9';
   String _activeEncoder = 'Hardware (VideoToolbox/MediaCodec)';
   bool isSimulatorTestMode = const bool.fromEnvironment('TEST_MODE', defaultValue: false);
+  final QaStatsSampler _qaSampler = QaStatsSampler();
+  CallStatus? _qaLastStatus;
 
   WebRtcCallManager({
     FirebaseFirestore? firestore,
@@ -76,6 +79,7 @@ class WebRtcCallManager extends ChangeNotifier {
           consecutiveGoodSamplesRequired: 5,
         ) {
     qualityController.onTierChanged = _onResolutionTierChanged;
+    if (kQaBuild) QaHooks.activeManager = this;
   }
 
   CallStatus get status => _status;
@@ -198,6 +202,7 @@ class WebRtcCallManager extends ChangeNotifier {
     _connectionTimeoutTimer = null;
     _statsTimer?.cancel();
     _statsTimer = null;
+    if (kQaBuild) _qaSampler.stop();
     _callDocSubscription?.cancel();
     _callDocSubscription = null;
     _candidatesSubscription?.cancel();
@@ -584,6 +589,16 @@ class WebRtcCallManager extends ChangeNotifier {
     if (!isAudioOnly) {
       localRenderer.srcObject = _localStream;
     }
+    if (kQaBuild) {
+      final vt = _localStream!.getVideoTracks();
+      QaLog.event('capture', {
+        'isFrontCamera': _isFrontCamera,
+        'requested': mediaConstraints,
+        'actual': vt.isEmpty ? null : vt.first.getSettings(),
+        'audioTracks': _localStream!.getAudioTracks().length,
+        'simulatorFallback': isSimulatorTestMode,
+      });
+    }
 
     if (!kIsWeb && Platform.isAndroid) {
       try {
@@ -643,15 +658,9 @@ class WebRtcCallManager extends ChangeNotifier {
     // 4. Handle Remote Track
     _peerConnection!.onTrack = (event) {
       _log('Received remote track: kind=${event.track.kind}, streams=${event.streams.length}');
+      if (kQaBuild) QaLog.event('onTrack', {'kind': event.track.kind});
       if (event.streams.isNotEmpty) {
-        if (!isAudioOnly) {
-          remoteRenderer.srcObject = event.streams[0];
-        }
-        if (event.track.kind == 'video' || isAudioOnly) {
-          _handleConnectionRecovered();
-          _onConnected();
-        }
-        notifyListeners();
+        _onRemoteTrack(event.streams[0], isAudioOnly: isAudioOnly);
       }
     };
 
@@ -688,6 +697,7 @@ class WebRtcCallManager extends ChangeNotifier {
     // 6. Handle Connection States
     _peerConnection!.onIceConnectionState = (state) {
       _log('ICE Connection State changed: $state');
+      if (kQaBuild) QaLog.event('ice', {'state': state.name});
       if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
           state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
         _handleConnectionRecovered();
@@ -706,6 +716,7 @@ class WebRtcCallManager extends ChangeNotifier {
 
     _peerConnection!.onConnectionState = (state) {
       _log('Peer Connection State changed: $state');
+      if (kQaBuild) QaLog.event('pc', {'state': state.name});
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
           Future.delayed(const Duration(milliseconds: 300), () async {
@@ -725,6 +736,22 @@ class WebRtcCallManager extends ChangeNotifier {
       }
     };
   }
+
+  /// Attaches the remote stream for rendering. A remote track arrives as soon
+  /// as the remote description is applied, before ICE has connected, so it
+  /// must NOT mark the call connected (that would start the duration timer
+  /// early and show "connected" for calls whose media never flows). Only
+  /// ICE/peer-connection "connected" transitions call [_onConnected].
+  void _onRemoteTrack(MediaStream stream, {required bool isAudioOnly}) {
+    if (!isAudioOnly) {
+      remoteRenderer.srcObject = stream;
+    }
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void handleRemoteTrackForTesting(MediaStream stream, {bool isAudioOnly = false}) =>
+      _onRemoteTrack(stream, isAudioOnly: isAudioOnly);
 
   void _listenForRemoteCandidates(String callId, {required bool isCaller}) {
     final remoteCollection = isCaller ? 'calleeCandidates' : 'callerCandidates';
@@ -775,6 +802,18 @@ class WebRtcCallManager extends ChangeNotifier {
     _connectedAt = DateTime.now();
     _status = CallStatus.connected;
     _startStatsPolling();
+    if (kQaBuild) {
+      _qaSampler.start(_peerConnection!, _isCaller ? 'caller' : 'callee');
+      unawaited(() async {
+        try {
+          final l = await _peerConnection?.getLocalDescription();
+          final r = await _peerConnection?.getRemoteDescription();
+          QaLog.event('sdp', {'local': QaLog.sdpSummary(l?.sdp), 'remote': QaLog.sdpSummary(r?.sdp)});
+        } catch (e) {
+          QaLog.event('sdp_error', {'error': '$e'});
+        }
+      }());
+    }
     _logConnectedCandidatePair();
     notifyListeners();
   }
@@ -792,9 +831,10 @@ class WebRtcCallManager extends ChangeNotifier {
   }
 
   void _onRingingTimeout() {
+    _log('Call failed: no answer within 30 s.');
+    _releaseMediaAfterFailure();
     _status = CallStatus.failed;
     _failureReason = 'No answer — recipient did not respond in time.';
-    _log('Call failed: $_failureReason');
     notifyListeners();
 
     if (_currentSession != null) {
@@ -839,6 +879,10 @@ class WebRtcCallManager extends ChangeNotifier {
     _log(
       'Connection failed: $_failureReason (isLocalNetworkDenied=$_isLocalNetworkDenied, gatheredTypes=$_gatheredCandidateTypes)',
     );
+    final reasonToKeep = _failureReason;
+    _releaseMediaAfterFailure();
+    _status = CallStatus.failed;
+    _failureReason = reasonToKeep;
     notifyListeners();
 
     if (_currentSession != null) {
@@ -850,6 +894,20 @@ class WebRtcCallManager extends ChangeNotifier {
       _cleanupCallSignaling(id);
     }
   }
+
+  /// Stops camera/mic, closes the peer connection and cancels listeners when
+  /// a call fails, so the device is not left capturing behind the failure
+  /// overlay. Keeps the diagnostic flags the failure UI reads.
+  void _releaseMediaAfterFailure() {
+    final denied = _isLocalNetworkDenied;
+    final hadHost = _hasGatheredHostCandidate;
+    _resetCallState();
+    _isLocalNetworkDenied = denied;
+    _hasGatheredHostCandidate = hadHost;
+  }
+
+  @visibleForTesting
+  bool get hasLiveMediaForTesting => _localStream != null || _peerConnection != null;
 
   Future<void> _cleanupCallSignaling(String callId) async {
     try {
@@ -1181,6 +1239,14 @@ class WebRtcCallManager extends ChangeNotifier {
 
   void _handleConnectionLostWithGracePeriod({required String reason}) {
     if (_status != CallStatus.connected) {
+      // Before the first connection, ICE can report 'failed' transiently
+      // while candidates are still arriving (seen on a real iPhone: checking
+      // -> failed within 1 ms, call killed although a retry connected in
+      // 367 ms). If the negotiation timeout is running, let it decide.
+      if (_connectionTimeoutTimer?.isActive ?? false) {
+        _log('Pre-connect $reason; waiting for the negotiation timeout before failing.');
+        return;
+      }
       if (_status != CallStatus.failed &&
           _status != CallStatus.ended &&
           _status != CallStatus.rejected) {
@@ -1235,6 +1301,9 @@ class WebRtcCallManager extends ChangeNotifier {
       _handleConnectionLostWithGracePeriod(reason: 'ICE connection state failed');
     }
   }
+
+  @visibleForTesting
+  void startConnectionTimeoutForTesting(Duration d) => _startConnectionTimeoutTimer(duration: d);
 
   @visibleForTesting
   void setStatusForTesting(CallStatus newStatus) {
@@ -1316,6 +1385,10 @@ class WebRtcCallManager extends ChangeNotifier {
 
   @override
   void notifyListeners() {
+    if (kQaBuild && _qaLastStatus != _status) {
+      _qaLastStatus = _status;
+      QaLog.event('status', {'status': _status.name, 'reason': _failureReason, 'callId': _currentSession?.id});
+    }
     if (!_isDisposed) {
       super.notifyListeners();
     }

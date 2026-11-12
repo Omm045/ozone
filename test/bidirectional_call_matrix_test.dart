@@ -23,9 +23,9 @@ void main() {
         ResolutionTier.p1080,
       );
       final macVideo = macConstraints['video'] as Map<String, dynamic>;
-      expect(macVideo['width'], {'ideal': 1920, 'max': 1920});
-      expect(macVideo['height'], {'ideal': 1080, 'max': 1080});
-      expect(macVideo['frameRate'], {'ideal': 30, 'max': 30});
+      expect(macVideo['width'], {'ideal': '1920', 'max': 1920});
+      expect(macVideo['height'], {'ideal': '1080', 'max': 1080});
+      expect(macVideo['frameRate'], {'ideal': '30', 'max': 30});
       expect(macVideo.containsKey('mandatory'), isFalse);
 
       // iOS Side: Native W3C constraints without mandatory maps
@@ -103,7 +103,7 @@ void main() {
       final macConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
         ResolutionTier.p1080,
       );
-      expect(macConstraints['video']['width'], {'ideal': 1920, 'max': 1920});
+      expect(macConstraints['video']['width'], {'ideal': '1920', 'max': 1920});
 
       CameraConstraintSelector.clearCacheForTesting();
       CameraConstraintSelector.isAndroidOverrideForTesting = true;

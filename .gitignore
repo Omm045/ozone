@@ -57,3 +57,15 @@ ios/Runner/GoogleService-Info.plist
 macos/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
 
+
+# QA-only artifacts and credentials (never committed)
+.qa/
+qa_artifacts/
+
+# Private QA material (kept outside the public repo; see ~/ozone-private)
+QA_REPORT.md
+QA_PROGRESS.md
+firestore.rules.proposed
+tool/qa/
+integration_test/qa/
+test_driver/integration_test.dart

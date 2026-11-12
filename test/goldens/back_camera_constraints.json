@@ -1,0 +1,3006 @@
+{
+  "ios/720p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/720p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/1080p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/1080p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/1440p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/1440p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/4K/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/4K/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920
+      },
+      "height": {
+        "ideal": 1080
+      },
+      "frameRate": {
+        "ideal": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/720pFallback": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1280,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 720,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "ios/4kUpgrade": {
+    "width": {
+      "ideal": 3840,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 2160,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "ios/1080p": {
+    "width": {
+      "ideal": 1920,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 1080,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "android/720p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/720p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/1080p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/1080p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/1440p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/1440p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/4K/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/4K/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/720pFallback": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1280,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 720,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "android/4kUpgrade": {
+    "width": {
+      "ideal": 3840,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 2160,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "android/1080p": {
+    "width": {
+      "ideal": 1920,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 1080,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "macos/720p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/720p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/1080p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/1080p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/1440p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/1440p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/4K/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/4K/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/720pFallback": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1280,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 720,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "macos/4kUpgrade": {
+    "width": {
+      "ideal": 3840,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 2160,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "macos/1080p": {
+    "width": {
+      "ideal": 1920,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 1080,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "generic/720p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1280",
+        "maxHeight": "720",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 1280
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 720
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 30
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "30"
+        }
+      ]
+    }
+  },
+  "generic/720p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1280",
+        "maxHeight": "720",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "60"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 1280
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 720
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 60
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "60"
+        },
+        {
+          "minFrameRate": "60"
+        },
+        {
+          "maxFrameRate": "60"
+        }
+      ]
+    }
+  },
+  "generic/1080p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 30
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "30"
+        }
+      ]
+    }
+  },
+  "generic/1080p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "60"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 60
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "60"
+        },
+        {
+          "minFrameRate": "60"
+        },
+        {
+          "maxFrameRate": "60"
+        }
+      ]
+    }
+  },
+  "generic/1440p/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 30
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "30"
+        }
+      ]
+    }
+  },
+  "generic/1440p/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "1920",
+        "maxHeight": "1080",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "60"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 1920
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 1080
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 60
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "60"
+        },
+        {
+          "minFrameRate": "60"
+        },
+        {
+          "maxFrameRate": "60"
+        }
+      ]
+    }
+  },
+  "generic/4K/fps30": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "3840",
+        "maxHeight": "2160",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "30"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 3840
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 2160
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 30
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "30"
+        }
+      ]
+    }
+  },
+  "generic/4K/fps60": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "mandatory": {
+        "minWidth": "1280",
+        "minHeight": "720",
+        "maxWidth": "3840",
+        "maxHeight": "2160",
+        "idealWidth": "1920",
+        "idealHeight": "1080",
+        "minFrameRate": "24",
+        "maxFrameRate": "60"
+      },
+      "width": {
+        "min": 1280,
+        "ideal": 1920,
+        "max": 3840
+      },
+      "height": {
+        "min": 720,
+        "ideal": 1080,
+        "max": 2160
+      },
+      "frameRate": {
+        "min": 24,
+        "ideal": 30,
+        "max": 60
+      },
+      "facingMode": "environment",
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        },
+        {
+          "minWidth": "1280"
+        },
+        {
+          "minHeight": "720"
+        },
+        {
+          "idealWidth": "1920"
+        },
+        {
+          "idealHeight": "1080"
+        },
+        {
+          "minFrameRate": "24"
+        },
+        {
+          "maxFrameRate": "60"
+        },
+        {
+          "minFrameRate": "60"
+        },
+        {
+          "maxFrameRate": "60"
+        }
+      ]
+    }
+  },
+  "generic/720pFallback": {
+    "audio": {
+      "echoCancellation": true,
+      "noiseSuppression": true,
+      "autoGainControl": true,
+      "mandatory": {
+        "googEchoCancellation": "true",
+        "googEchoCancellation2": "true",
+        "googAutoGainControl": "true",
+        "googAutoGainControl2": "true",
+        "googNoiseSuppression": "true",
+        "googHighpassFilter": "true",
+        "googTypingNoiseDetection": "true",
+        "googAudioMirroring": "false"
+      },
+      "optional": [
+        {
+          "echoCancellation": true
+        },
+        {
+          "noiseSuppression": true
+        },
+        {
+          "autoGainControl": true
+        },
+        {
+          "googAutoGainControl": true
+        },
+        {
+          "googAutoGainControl2": true
+        },
+        {
+          "googHighpassFilter": true
+        },
+        {
+          "googNoiseSuppression": true
+        },
+        {
+          "googEchoCancellation": true
+        }
+      ]
+    },
+    "video": {
+      "facingMode": "environment",
+      "width": {
+        "ideal": 1280,
+        "max": 1920
+      },
+      "height": {
+        "ideal": 720,
+        "max": 1080
+      },
+      "frameRate": {
+        "ideal": 30,
+        "max": 30
+      },
+      "optional": [
+        {
+          "focusMode": "continuous"
+        },
+        {
+          "exposureMode": "continuous"
+        },
+        {
+          "whiteBalanceMode": "continuous"
+        }
+      ]
+    }
+  },
+  "generic/4kUpgrade": {
+    "width": {
+      "ideal": 3840,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 2160,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  },
+  "generic/1080p": {
+    "width": {
+      "ideal": 1920,
+      "max": 3840
+    },
+    "height": {
+      "ideal": 1080,
+      "max": 2160
+    },
+    "frameRate": {
+      "ideal": 30,
+      "max": 30
+    },
+    "facingMode": "environment",
+    "optional": [
+      {
+        "focusMode": "continuous"
+      },
+      {
+        "exposureMode": "continuous"
+      },
+      {
+        "whiteBalanceMode": "continuous"
+      }
+    ]
+  }
+}
