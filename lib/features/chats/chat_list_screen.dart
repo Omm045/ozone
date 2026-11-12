@@ -1,6 +1,4 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -213,227 +211,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  void _showGroupConferenceDialog(BuildContext context) {
-    OzoneHaptics.light();
-    final randomCode = 'OZ-${Random().nextInt(9000) + 1000}';
-    final codeController = TextEditingController(text: randomCode);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: OzoneTheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: OzoneTheme.hairlineBorderSide,
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.groups_rounded, color: OzoneTheme.cyan, size: 26),
-            SizedBox(width: 10),
-            Text(
-              'Group Mesh Conference',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: OzoneTheme.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Start or join an encrypted peer-to-peer group room with 1080p HD video and spatial audio:',
-              style: TextStyle(color: OzoneTheme.textSecondary, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: OzoneTheme.background,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: OzoneTheme.cyan.withValues(alpha: 0.4), width: 1.5),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: codeController,
-                      style: const TextStyle(
-                        color: OzoneTheme.cyan,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2.0,
-                      ),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        hintText: 'ROOM CODE',
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy_rounded, color: OzoneTheme.textSecondary, size: 20),
-                    tooltip: 'Copy Code',
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: codeController.text));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Room code copied to clipboard')),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: OzoneTheme.textSecondary)),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Connecting to Mesh Room: ${codeController.text}...'),
-                  backgroundColor: OzoneTheme.surface,
-                ),
-              );
-            },
-            icon: const Icon(Icons.video_call_rounded, size: 20),
-            label: const Text('Join Room'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGroupConferenceHeroBanner(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: OzoneTheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: OzoneTheme.cyan.withValues(alpha: 0.25),
-          width: 1,
-        ),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            OzoneTheme.surface,
-            OzoneTheme.indigo.withValues(alpha: 0.12),
-            OzoneTheme.cyan.withValues(alpha: 0.08),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: OzoneTheme.cyan.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: OzoneTheme.cyan.withValues(alpha: 0.4), width: 1),
-                ),
-                child: const Icon(Icons.groups_rounded, color: OzoneTheme.cyan, size: 20),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Group Conference',
-                style: TextStyle(
-                  color: OzoneTheme.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: OzoneTheme.emerald.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: OzoneTheme.emerald.withValues(alpha: 0.35), width: 1),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.bolt_rounded, color: OzoneTheme.emerald, size: 12),
-                    SizedBox(width: 3),
-                    Text(
-                      'P2P MESH',
-                      style: TextStyle(
-                        color: OzoneTheme.emerald,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Instant 1080p multi-peer video room with zero server relay costs.',
-            style: TextStyle(color: OzoneTheme.textSecondary, fontSize: 13, height: 1.3),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _showGroupConferenceDialog(context),
-                  icon: const Icon(Icons.add_link_rounded, size: 18),
-                  label: const Text('Start Room'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    backgroundColor: OzoneTheme.cyan,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showGroupConferenceDialog(context),
-                  icon: const Icon(Icons.login_rounded, size: 18, color: OzoneTheme.textPrimary),
-                  label: const Text('Join by Code', style: TextStyle(color: OzoneTheme.textPrimary)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    side: OzoneTheme.hairlineBorderSide,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Padding(
@@ -501,13 +278,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }) {
     return ListView.builder(
       padding: EdgeInsets.symmetric(horizontal: isSidebar ? 12 : 16, vertical: 8),
-      itemCount: chats.length + 1, // +1 for hero banner
+      itemCount: chats.length,
       itemBuilder: (context, index) {
-        if (index == 0) {
-          return _buildGroupConferenceHeroBanner(context);
-        }
-
-        final chat = chats[index - 1];
+        final chat = chats[index];
         final otherEmail = chat.otherUserEmail(currentUser.email);
         final isInvite = chat.isPendingInvite;
         final isSelected = isSidebar && _selectedChat?.id == chat.id;
@@ -736,7 +509,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Select a conversation or start an instant HD conference',
+            'Select a conversation or connect by email',
             style: TextStyle(
               fontSize: 14,
               color: OzoneTheme.textSecondary,
@@ -750,17 +523,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 onPressed: () => _showConnectDialog(context),
                 icon: const Icon(Icons.person_add_alt_1, size: 18),
                 label: const Text('Connect by Email'),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () => _showGroupConferenceDialog(context),
-                icon: const Icon(Icons.groups_rounded, size: 18, color: OzoneTheme.cyan),
-                label: const Text('Group Room', style: TextStyle(color: OzoneTheme.cyan)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: OzoneTheme.cyan, width: 1.2),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
               ),
             ],
           ),
@@ -864,7 +626,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   ),
                 ),
 
-                // Right Chat / Conference Stage
+                // Right Chat Stage
                 Expanded(
                   child: _selectedChat != null
                       ? ConversationScreen(

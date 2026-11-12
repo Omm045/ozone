@@ -13,7 +13,7 @@ import 'package:ozone/models/user_model.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Cross-Platform Bidirectional Call Matrix & Multi-Peer Mesh E2E Tests', () {
+  group('Cross-Platform Bidirectional 1:1 Call Matrix Tests', () {
     final now = DateTime.now();
 
     final macUser = UserModel(uid: 'mac_uid', email: 'mac@ozone.test', createdAt: now);
@@ -290,7 +290,7 @@ void main() {
       );
     });
 
-    test('6. Multi-Peer Mesh Signaling & Glare Determinism (3-way & 4-way Mesh)', () {
+    test('6. Pairwise glare determinism across platforms', () {
       final peers = [macUser, iosUser1, androidUser1, iosUser2];
 
       // Verify deterministic glare resolution across every distinct pair

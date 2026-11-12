@@ -243,12 +243,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
             tooltip: 'Start Video Call (1080p HD)',
             onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.video),
           ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.screen_share_rounded, color: OzoneTheme.indigo, size: 22),
-            tooltip: 'Screen Share (HD)',
-            onPressed: () => _startCall(currentUser, otherEmail, callType: CallType.video),
-          ),
         ],
       ),
     );
