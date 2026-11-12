@@ -1,48 +1,145 @@
 name: Release iOS Unsigned IPA
 
+# Builds an UNSIGNED iOS IPA (no signing identity or provisioning profile is
+# ever used or stored here). Users re-sign it themselves with AltStore or
+# Sideloadly.
+#
+# - Tag push (v*): builds that tag and attaches the IPA to its release.
+# - Manual run: builds the chosen tag; attaches only if attach=true,
+#   otherwise only uploads a workflow artifact.
+
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build (e.g. v2.0.0)'
+        required: true
+        type: string
+      attach:
+        description: 'Attach the IPA to that tag''s GitHub release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-ipa-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-release-ipa:
-    name: Build & Attach Unsigned iOS IPA
-    runs-on: macos-latest
-    permissions:
-      contents: write
+  build-ipa:
+    name: Build unsigned iOS IPA
+    # Pinned image + Xcode instead of macos-latest so builds don't change
+    # silently. Project deployment target is iOS 15.0.
+    runs-on: macos-26
+    env:
+      REF_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      ATTACH: ${{ github.event_name == 'push' || inputs.attach }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF_TAG }}
 
-      - name: Set up Flutter
+      - name: Select Xcode 26.6
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          xcodebuild -version
+
+      - name: Set up Flutter (same version as the release machine)
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
+          flutter-version: 3.47.9
           cache: true
+
+      # Root cause of the earlier failures: with Swift Package Manager enabled,
+      # Xcode could not resolve firebase-ios-sdk 13.1.1 together with
+      # googlesignin-ios 8.x (app-check version conflict). The project builds
+      # with CocoaPods, so SPM is disabled here, as on the release Mac.
+      - name: Disable Swift Package Manager (use CocoaPods)
+        run: flutter config --no-enable-swift-package-manager
+
+      - name: Refuse QA material
+        run: |
+          if git ls-files | grep -E '^(\.qa/|tool/qa/|integration_test/qa/|qa_artifacts/)' ; then
+            echo "::error::QA material is tracked in this ref; refusing to build a release IPA."
+            exit 1
+          fi
+
+      # The Firebase client config files are gitignored. Decode them from
+      # repository secrets. Never printed: no `set -x`, no cat.
+      - name: Inject Firebase config from secrets
+        env:
+          FIREBASE_OPTIONS_DART_B64: ${{ secrets.FIREBASE_OPTIONS_DART_B64 }}
+          IOS_GOOGLE_SERVICE_INFO_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}
+        run: |
+          set +x
+          umask 077
+          if [ -z "$FIREBASE_OPTIONS_DART_B64" ] || [ -z "$IOS_GOOGLE_SERVICE_INFO_B64" ]; then
+            echo "::error::Firebase config secrets are not set."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_OPTIONS_DART_B64" | base64 --decode > lib/firebase_options.dart
+          printf '%s' "$IOS_GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+          test -s lib/firebase_options.dart
+          plutil -lint -s ios/Runner/GoogleService-Info.plist
+          echo "Firebase config injected."
 
       - name: Install dependencies
         run: |
           flutter pub get
-          cd ios && pod install && cd ..
+          cd ios && pod install
 
-      - name: Build unsigned iOS release bundle
+      # No --dart-define flags: QA instrumentation (QA=true) and QA
+      # credentials can never be compiled into this build.
+      - name: Build unsigned iOS release
         run: flutter build ios --release --no-codesign
 
-      - name: Package Payload into Unsigned IPA
+      - name: Verify the build (version, no QA code)
         run: |
-          mkdir -p build/ios/ipa_payload/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/ipa_payload/Payload/
-          cd build/ios/ipa_payload
-          zip -r ../../ozone-ios-${{ github.ref_name }}.ipa Payload
-          cd ../../..
-          rm -rf build/ios/ipa_payload
-          ls -lh build/ozone-ios-${{ github.ref_name }}.ipa
+          PLIST=build/ios/iphoneos/Runner.app/Info.plist
+          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+          APP_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
+          echo "Bundle: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST") $APP_VERSION ($APP_BUILD)"
+          if [ "v$APP_VERSION" != "$REF_TAG" ]; then
+            echo "::error::App version $APP_VERSION does not match tag $REF_TAG"
+            exit 1
+          fi
+          BIN=build/ios/iphoneos/Runner.app/Frameworks/App.framework/App
+          for p in QA_STATS QA_EVENT QaStatsSampler QA_RESULT; do
+            if grep -a -q -- "$p" "$BIN"; then
+              echo "::error::QA string '$p' found in the app binary"
+              exit 1
+            fi
+          done
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
 
-      - name: Upload IPA to GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Package unsigned IPA
+        run: |
+          IPA="ozone-ios-${APP_VERSION}-unsigned.ipa"
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          (cd build/ipa && zip -qry "../../$IPA" Payload)
+          rm -rf build/ipa
+          shasum -a 256 "$IPA"
+          echo "IPA=$IPA" >> "$GITHUB_ENV"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: build/ozone-ios-${{ github.ref_name }}.ipa
+          name: ${{ env.IPA }}
+          path: ${{ env.IPA }}
+          if-no-files-found: error
+
+      - name: Attach IPA to release
+        if: env.ATTACH == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$REF_TAG" "$IPA" --clobber --repo "$GITHUB_REPOSITORY"
