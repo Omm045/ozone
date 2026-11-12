@@ -272,6 +272,26 @@ class AdaptiveQualityController {
     deviceSupports60Fps = fps >= 60;
   }
 
+  /// Formats raw connection state names (e.g. 'RTCPeerConnectionStateConnected') into clean lowercase names (e.g. 'connected').
+  static String formatConnectionState(dynamic state) {
+    if (state == null) return 'connected';
+    final rawName = state.toString().split('.').last;
+    return rawName.replaceAll('RTCPeerConnectionState', '').toLowerCase();
+  }
+
+  /// Calculates the target bitrate for encoding parameters.
+  /// On Excellent networks (Direct P2P with < 20ms RTT), ensures maxBitrate is at least 6000000 bps.
+  int getTargetBitrateBps({String routeType = 'Direct P2P', double? rttMs}) {
+    final rtt = rttMs ?? _lastSample?.roundTripTimeMs ?? 40.0;
+    final isDirectP2P = routeType.contains('Direct P2P') || routeType.contains('host');
+    if (_currentTier >= ResolutionTier.p1080 && isDirectP2P && rtt < 20.0) {
+      if (_currentTier.targetBitrateBps < 6000000) {
+        return 6000000;
+      }
+    }
+    return _currentTier.targetBitrateBps;
+  }
+
   void setManualTier(ResolutionTier? tier) {
     _manualTier = tier;
     _consecutiveGoodSamples = 0;

@@ -258,25 +258,25 @@ void main() {
       expect(result.releaseNotes, 'Bug fixes and performance improvements.');
     });
 
-    test('Live GitHub Releases API integration test: detects v1.0.1 against previous 1.0.0 build', () async {
+    test('Live GitHub Releases API integration test: detects v1.1.0 against previous 1.0.0 build', () async {
       final result = await UpdateChecker.checkForUpdates(
         explicitCurrentVersion: '1.0.0',
       );
 
       expect(result.status, UpdateStatus.updateAvailable);
       expect(result.isUpdateAvailable, isTrue);
-      expect(result.latestVersion, '1.0.1');
-      expect(result.downloadUrl, 'https://github.com/Omm045/ozone/releases/tag/v1.0.1');
+      expect(result.latestVersion, '1.1.0');
+      expect(result.downloadUrl, 'https://github.com/Omm045/ozone/releases/tag/v1.1.0');
     });
 
-    test('Live GitHub Releases API integration test: reports up to date against current 1.0.1+2 build', () async {
+    test('Live GitHub Releases API integration test: reports up to date against current 1.1.0+3 build', () async {
       final result = await UpdateChecker.checkForUpdates(
-        explicitCurrentVersion: '1.0.1+2',
+        explicitCurrentVersion: '1.1.0+3',
       );
 
       expect(result.status, UpdateStatus.upToDate);
       expect(result.isUpdateAvailable, isFalse);
-      expect(result.latestVersion, '1.0.1');
+      expect(result.latestVersion, '1.1.0');
     });
   });
 }

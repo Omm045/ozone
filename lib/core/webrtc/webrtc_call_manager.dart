@@ -43,7 +43,7 @@ class WebRtcCallManager extends ChangeNotifier {
   bool _isMuted = false;
   bool _isVideoDisabled = false;
   bool _isFrontCamera = true;
-  bool _isSpeakerphoneOn = false;
+  bool _isSpeakerOn = true;
   DateTime? _connectedAt;
 
   Timer? _statsTimer;
@@ -83,7 +83,8 @@ class WebRtcCallManager extends ChangeNotifier {
   CallSession? get currentSession => _currentSession;
   bool get isMuted => _isMuted;
   bool get isVideoDisabled => _isVideoDisabled;
-  bool get isSpeakerphoneOn => _isSpeakerphoneOn;
+  bool get isSpeakerOn => _isSpeakerOn;
+  bool get isSpeakerphoneOn => _isSpeakerOn;
   DateTime? get connectedAt => _connectedAt;
   int get callDurationSeconds {
     if (_connectedAt == null || _status != CallStatus.connected) return 0;
@@ -103,16 +104,20 @@ class WebRtcCallManager extends ChangeNotifier {
   String get activeCodec => _activeCodec;
   String get activeEncoder => _activeEncoder;
 
-  Future<void> toggleSpeakerphone() async {
-    _isSpeakerphoneOn = !_isSpeakerphoneOn;
+  Future<void> toggleSpeaker() async {
+    _isSpeakerOn = !_isSpeakerOn;
     try {
-      await Helper.setSpeakerphoneOn(_isSpeakerphoneOn);
-      _log('Speakerphone state updated: $_isSpeakerphoneOn');
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        await Helper.setSpeakerphoneOn(_isSpeakerOn);
+        _log('Speakerphone state updated: $_isSpeakerOn');
+      }
     } catch (e) {
       _log('Speakerphone toggle note: $e');
     }
     notifyListeners();
   }
+
+  Future<void> toggleSpeakerphone() => toggleSpeaker();
 
   void _log(String message) {
     final now = DateTime.now();
@@ -479,6 +484,16 @@ class WebRtcCallManager extends ChangeNotifier {
       localRenderer.srcObject = _localStream;
     }
 
+    if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+      try {
+        await Helper.setSpeakerphoneOn(true);
+        _isSpeakerOn = true;
+        _log('Enforced speakerphone on mobile: true');
+      } catch (e) {
+        _log('Speakerphone initial routing note: $e');
+      }
+    }
+
     final audioTracks = _localStream!.getAudioTracks();
     final videoTracks = _localStream!.getVideoTracks();
     if (videoTracks.isNotEmpty) {
@@ -591,6 +606,11 @@ class WebRtcCallManager extends ChangeNotifier {
     _peerConnection!.onConnectionState = (state) {
       _log('Peer Connection State changed: $state');
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+          Helper.setSpeakerphoneOn(_isSpeakerOn).catchError((e) {
+            _log('Speakerphone re-assert note: $e');
+          });
+        }
         _handleConnectionRecovered();
         _onConnected();
       } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
@@ -890,7 +910,9 @@ class WebRtcCallManager extends ChangeNotifier {
         recvHeight = qualityController.currentTier.height;
       }
 
-      final connState = _peerConnection?.connectionState?.name ?? 'connected';
+      final connState = AdaptiveQualityController.formatConnectionState(
+        _peerConnection?.connectionState,
+      );
 
       final sample = NetworkStatsSample(
         availableBandwidthBps: sendingKbps * 1000.0,
@@ -956,7 +978,10 @@ class WebRtcCallManager extends ChangeNotifier {
       final parameters = _videoSender!.parameters;
       final encodings = parameters.encodings;
       if (encodings != null && encodings.isNotEmpty) {
-        final int maxBitrate = tier.targetBitrateBps;
+        final int maxBitrate = qualityController.getTargetBitrateBps(
+          routeType: _connectedPair ?? 'Direct P2P',
+          rttMs: _latestTelemetry.roundTripTimeMs.toDouble(),
+        );
         final int targetFps = (_nativeMaxFps > 0 ? _nativeMaxFps : tier.targetFps);
 
         for (final encoding in encodings) {
@@ -964,9 +989,14 @@ class WebRtcCallManager extends ChangeNotifier {
           encoding.maxFramerate = targetFps;
           encoding.scaleResolutionDownBy = tier.scaleResolutionDownBy;
         }
+        parameters.degradationPreference = RTCDegradationPreference.MAINTAIN_RESOLUTION;
         _videoSender!.setParameters(parameters);
         _lastAppliedTier = tier;
-        _log('Applied RTCRtpSender encoding parameters for $tier: maxBitrate=$maxBitrate bps, maxFramerate=$targetFps, scaleDown=${tier.scaleResolutionDownBy}');
+        _log(
+          'Applied RTCRtpSender encoding parameters for $tier: '
+          'maxBitrate=$maxBitrate bps, maxFramerate=$targetFps, scaleDown=${tier.scaleResolutionDownBy}, '
+          'degradationPreference=MAINTAIN_RESOLUTION',
+        );
       }
     } catch (e) {
       _log('Note: Error applying encoding parameters: $e');

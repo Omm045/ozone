@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'adaptive_quality_controller.dart';
@@ -149,10 +148,25 @@ class CameraConstraintSelector {
     _cachedFrontCameraNativeFormat = null;
   }
 
+  /// Convenience wrapper to retrieve media constraints.
+  static Map<String, dynamic> getMediaConstraints({
+    ResolutionTier tier = ResolutionTier.p1080,
+    bool isFrontCamera = true,
+    bool isAudioOnly = false,
+    int maxFps = standardFps,
+  }) {
+    return getMediaConstraintsForTier(
+      tier,
+      isFrontCamera: isFrontCamera,
+      isAudioOnly: isAudioOnly,
+      maxFps: maxFps,
+    );
+  }
+
   /// Builds media constraints matching the negotiated send resolution tier and call mode.
   /// When [isAudioOnly] is true, video is completely disabled ('video': false).
-  /// Maximum capture resolution is capped to 1920x1080 (defaulting to 1280x720 for stability)
-  /// and uses the native camera sensor's maximum supported frame rate (up to 60fps).
+  /// Passes explicit mandatory and optional constraints for 1080p / 720p HD capture,
+  /// including W3C dictionary constraints (width, height, frameRate) for macOS/iOS WebRTC.
   static Map<String, dynamic> getMediaConstraintsForTier(
     ResolutionTier tier, {
     bool isFrontCamera = true,
@@ -168,7 +182,24 @@ class CameraConstraintSelector {
       };
     }
 
-    // BACK CAMERA CODE PATH — 100% PRESERVED AND UNTOUCHED
+    final cappedFps = maxFps.clamp(15, maxFpsLimit);
+
+    final optionalConstraints = <Map<String, dynamic>>[
+      {'minWidth': '1280'},
+      {'minHeight': '720'},
+      {'idealWidth': '1920'},
+      {'idealHeight': '1080'},
+      {'minFrameRate': '24'},
+      {'maxFrameRate': cappedFps.toString()},
+    ];
+    if (cappedFps >= 60) {
+      optionalConstraints.addAll([
+        {'minFrameRate': '60'},
+        {'maxFrameRate': '60'},
+      ]);
+    }
+
+    // BACK CAMERA CODE PATH
     if (!isFrontCamera) {
       final int targetWidth;
       final int targetHeight;
@@ -182,15 +213,6 @@ class CameraConstraintSelector {
         targetHeight = maxResolutionHeight;
       }
 
-      final cappedFps = maxFps.clamp(15, maxFpsLimit);
-      final optionalConstraints = <Map<String, dynamic>>[];
-      if (cappedFps >= 60) {
-        optionalConstraints.addAll([
-          {'minFrameRate': '60'},
-          {'maxFrameRate': '60'},
-        ]);
-      }
-
       return {
         'audio': audioConstraints,
         'video': {
@@ -199,8 +221,25 @@ class CameraConstraintSelector {
             'minHeight': defaultResolutionHeight.toString(),
             'maxWidth': targetWidth.toString(),
             'maxHeight': targetHeight.toString(),
-            'minFrameRate': '15',
+            'idealWidth': '1920',
+            'idealHeight': '1080',
+            'minFrameRate': '24',
             'maxFrameRate': cappedFps.toString(),
+          },
+          'width': {
+            'min': 1280,
+            'ideal': 1920,
+            'max': targetWidth,
+          },
+          'height': {
+            'min': 720,
+            'ideal': 1080,
+            'max': targetHeight,
+          },
+          'frameRate': {
+            'min': 24,
+            'ideal': 30,
+            'max': cappedFps,
           },
           'facingMode': 'environment',
           'optional': optionalConstraints,
@@ -208,7 +247,7 @@ class CameraConstraintSelector {
       };
     }
 
-    // FRONT CAMERA ONLY: Query and use the device's native front-camera sensor resolution
+    // FRONT CAMERA: Query and use the device's native front-camera sensor resolution
     // and aspect ratio as the starting point, avoiding forced cropping or stretching.
     final nativeFormat = _cachedFrontCameraNativeFormat ??
         const (
@@ -247,25 +286,33 @@ class CameraConstraintSelector {
       frontMinHeight = (frontTargetHeight * 0.6).round();
     }
 
-    final cappedFps = maxFps.clamp(15, maxFpsLimit);
-    final optionalConstraints = <Map<String, dynamic>>[];
-    if (cappedFps >= 60) {
-      optionalConstraints.addAll([
-        {'minFrameRate': '60'},
-        {'maxFrameRate': '60'},
-      ]);
-    }
-
     return {
       'audio': audioConstraints,
       'video': {
         'mandatory': {
-          'minWidth': frontMinWidth.toString(),
-          'minHeight': frontMinHeight.toString(),
+          'minWidth': isLandscapeSensor ? '1280' : frontMinWidth.toString(),
+          'minHeight': isLandscapeSensor ? '720' : frontMinHeight.toString(),
           'maxWidth': frontTargetWidth.toString(),
           'maxHeight': frontTargetHeight.toString(),
-          'minFrameRate': '15',
+          'idealWidth': '1920',
+          'idealHeight': '1080',
+          'minFrameRate': '24',
           'maxFrameRate': cappedFps.toString(),
+        },
+        'width': {
+          'min': isLandscapeSensor ? 1280 : frontMinWidth,
+          'ideal': 1920,
+          'max': frontTargetWidth,
+        },
+        'height': {
+          'min': isLandscapeSensor ? 720 : frontMinHeight,
+          'ideal': 1080,
+          'max': frontTargetHeight,
+        },
+        'frameRate': {
+          'min': 24,
+          'ideal': 30,
+          'max': cappedFps,
         },
         'facingMode': 'user',
         'optional': optionalConstraints,
@@ -273,40 +320,33 @@ class CameraConstraintSelector {
     };
   }
 
-  /// Optimized audio constraints tuned per platform.
-  /// On macOS, disabling aggressive WebRTC software noiseSuppression and highpass filter
-  /// prevents built-in MacBook mic input from being over-attenuated into near-silence.
+  /// High-fidelity audio constraints with echo cancellation, noise suppression,
+  /// automatic gain control, and Google WebRTC voice processing flags.
   static dynamic _getAudioConstraints() {
-    if (kIsWeb) {
-      return {
-        'echoCancellation': true,
-        'autoGainControl': true,
-        'noiseSuppression': true,
-      };
-    }
-
-    if (Platform.isMacOS) {
-      return {
-        'mandatory': {
-          'googEchoCancellation': 'true',
-          'googAutoGainControl': 'true',
-          'googNoiseSuppression': 'false', // Prevent signal crushing on macOS mic
-          'googHighpassFilter': 'false', // Retain natural voice frequencies
-          'googTypingNoiseDetection': 'false',
-          'googAudioMirroring': 'false',
-        },
-        'optional': <Map<String, dynamic>>[],
-      };
-    }
-
     return {
+      'echoCancellation': true,
+      'noiseSuppression': true,
+      'autoGainControl': true,
       'mandatory': {
         'googEchoCancellation': 'true',
+        'googEchoCancellation2': 'true',
         'googAutoGainControl': 'true',
+        'googAutoGainControl2': 'true',
         'googNoiseSuppression': 'true',
         'googHighpassFilter': 'true',
+        'googTypingNoiseDetection': 'true',
+        'googAudioMirroring': 'false',
       },
-      'optional': <Map<String, dynamic>>[],
+      'optional': <Map<String, dynamic>>[
+        {'echoCancellation': true},
+        {'noiseSuppression': true},
+        {'autoGainControl': true},
+        {'googAutoGainControl': true},
+        {'googAutoGainControl2': true},
+        {'googHighpassFilter': true},
+        {'googNoiseSuppression': true},
+        {'googEchoCancellation': true},
+      ],
     };
   }
 

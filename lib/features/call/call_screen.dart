@@ -224,6 +224,18 @@ class _CallScreenState extends State<CallScreen> {
           ),
           const SizedBox(width: 8),
           IconButton(
+            icon: Icon(
+              _callManager.isSpeakerOn
+                  ? Icons.volume_up_rounded
+                  : Icons.volume_down_rounded,
+              color: _callManager.isSpeakerOn ? OzoneTheme.cyan : Colors.white,
+              size: 24,
+            ),
+            tooltip: _callManager.isSpeakerOn ? 'Speaker: On' : 'Speaker: Off',
+            onPressed: () => _callManager.toggleSpeaker(),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
             icon: const Icon(
               Icons.speed_rounded,
               color: Colors.white,

@@ -102,6 +102,21 @@ class SdpUtils {
 
     if (opusPt == null) return sdp;
 
+    // Prioritize Opus payload type at the very front of the m=audio media descriptor
+    final mAudioIndex = lines.indexWhere((l) => l.startsWith('m=audio '));
+    if (mAudioIndex != -1) {
+      final parts = lines[mAudioIndex].split(' ');
+      if (parts.length > 3) {
+        final header = parts.sublist(0, 3);
+        final pts = parts.sublist(3);
+        if (pts.contains(opusPt)) {
+          pts.remove(opusPt);
+          pts.insert(0, opusPt);
+          lines[mAudioIndex] = '${header.join(' ')} ${pts.join(' ')}';
+        }
+      }
+    }
+
     final fmtpPrefix = 'a=fmtp:$opusPt ';
     final fmtpIndex = lines.indexWhere((l) => l.startsWith(fmtpPrefix));
 

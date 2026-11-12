@@ -138,6 +138,78 @@ void main() {
 
       manager.dispose();
     });
+
+    test('Force True 1080p/720p HD capture constraints and audio gain control flags', () {
+      final constraints = CameraConstraintSelector.getMediaConstraints(
+        tier: ResolutionTier.p1080,
+        isFrontCamera: true,
+      );
+
+      final video = constraints['video'] as Map<String, dynamic>;
+      final mandatory = video['mandatory'] as Map<String, dynamic>;
+      expect(mandatory['minWidth'], '1280');
+      expect(mandatory['minHeight'], '720');
+      expect(mandatory['idealWidth'], '1920');
+      expect(mandatory['idealHeight'], '1080');
+      expect(mandatory['minFrameRate'], '24');
+      expect(mandatory['maxFrameRate'], '30');
+
+      // W3C dictionary constraints for macOS / iOS WebRTC
+      expect(video['width'], {'min': 1280, 'ideal': 1920, 'max': 1920});
+      expect(video['height'], {'min': 720, 'ideal': 1080, 'max': 1080});
+      expect(video['frameRate'], {'min': 24, 'ideal': 30, 'max': 30});
+
+      // Audio processing and Google WebRTC gain control flags
+      final audio = constraints['audio'] as Map<String, dynamic>;
+      expect(audio['echoCancellation'], isTrue);
+      expect(audio['noiseSuppression'], isTrue);
+      expect(audio['autoGainControl'], isTrue);
+      final audioMandatory = audio['mandatory'] as Map<String, dynamic>;
+      expect(audioMandatory['googAutoGainControl'], 'true');
+      expect(audioMandatory['googHighpassFilter'], 'true');
+      expect(audioMandatory['googEchoCancellation'], 'true');
+    });
+
+    test('AdaptiveQualityController minimum 6Mbps bitrate on direct P2P and clean state format', () {
+      final controller = AdaptiveQualityController(initialTier: ResolutionTier.p1080);
+
+      // Excellent direct P2P network with < 20ms RTT must not cap below 6000000 bps
+      final directP2PBitrate = controller.getTargetBitrateBps(
+        routeType: 'Direct P2P',
+        rttMs: 15.0,
+      );
+      expect(directP2PBitrate, greaterThanOrEqualTo(6000000));
+
+      // Clean connectionState formatting
+      expect(
+        AdaptiveQualityController.formatConnectionState(
+          RTCPeerConnectionState.RTCPeerConnectionStateConnected,
+        ),
+        'connected',
+      );
+      expect(
+        AdaptiveQualityController.formatConnectionState(
+          RTCPeerConnectionState.RTCPeerConnectionStateConnecting,
+        ),
+        'connecting',
+      );
+    });
+
+    test('WebRtcCallManager speaker state defaults to true for video calls and toggles', () async {
+      final manager = WebRtcCallManager();
+      expect(manager.isSpeakerOn, isTrue);
+      expect(manager.isSpeakerphoneOn, isTrue);
+
+      await manager.toggleSpeaker();
+      expect(manager.isSpeakerOn, isFalse);
+      expect(manager.isSpeakerphoneOn, isFalse);
+
+      await manager.toggleSpeaker();
+      expect(manager.isSpeakerOn, isTrue);
+      expect(manager.isSpeakerphoneOn, isTrue);
+
+      manager.dispose();
+    });
   });
 
   group('Connection Telemetry & QualityIndicatorWidget Modal Tests', () {
