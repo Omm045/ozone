@@ -1,8 +1,9 @@
 class SdpUtils {
-  /// Munges SDP to optimize video and audio codec negotiation for high-end P2P calls:
-  /// 1. Video: Prioritizes High-Profile H.264 (profile-level-id=640032 / 6400 for 1080p/4K
-  ///    Apple VideoToolbox and Android MediaCodec hardware encoding), followed by
-  ///    Constrained-Baseline H.264 (42e01f / 4200), VP8, and VP9 as fallbacks.
+  /// Munges SDP to optimize video and audio codec negotiation for cross-platform P2P calls:
+  /// 1. Video: Prioritizes Constrained-Baseline H.264 (profile-level-id=42e01f / 42001f) and VP8
+  ///    ahead of High-Profile H.264 (640032) to prevent Android MediaCodec hardware decoder
+  ///    freezes across Android <-> Mac, Android <-> iPhone, and Android <-> Android calls,
+  ///    while retaining High-Profile and VP9 as rich fallbacks.
   ///    Appends x-google-min-bitrate=2500;x-google-start-bitrate=6000;x-google-max-bitrate=16000
   ///    to video a=fmtp lines so video starts sharp on frame 1 without ramping slowly.
   /// 2. Audio: Tunes Opus to 64 kbps (crystal clear voice), enables in-band FEC
@@ -73,10 +74,10 @@ class SdpUtils {
     }
 
     final reordered = [
-      ...highH264Pts,
       ...baselineH264Pts,
-      ...otherH264Pts,
       ...vp8Pts,
+      ...highH264Pts,
+      ...otherH264Pts,
       ...vp9Pts,
       ...otherPts,
     ];
@@ -84,7 +85,7 @@ class SdpUtils {
 
     // Inject Google WebRTC bitrate parameters on video fmtp lines so video starts sharp on frame 1
     const bitrateParams = 'x-google-min-bitrate=2500;x-google-start-bitrate=6000;x-google-max-bitrate=16000';
-    final videoPts = [...highH264Pts, ...baselineH264Pts, ...otherH264Pts, ...vp8Pts, ...vp9Pts];
+    final videoPts = [...baselineH264Pts, ...vp8Pts, ...highH264Pts, ...otherH264Pts, ...vp9Pts];
 
     for (final pt in videoPts) {
       final fmtpPrefix = 'a=fmtp:$pt ';

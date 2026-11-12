@@ -136,47 +136,67 @@ class _CallScreenState extends State<CallScreen> {
     super.dispose();
   }
 
-  Widget _buildTopCenterOverlay() {
+  void _handleEndCall() {
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+    unawaited(_callManager.endCall());
+  }
+
+  Widget _buildTopBarOverlay() {
     return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          margin: const EdgeInsets.only(top: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.65),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white12, width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _peerDisplayName,
-                style: const TextStyle(
-                  color: OzoneTheme.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0x99000000),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white12, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _peerDisplayName,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: OzoneTheme.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.lock_rounded,
+                        color: OzoneTheme.cyan,
+                        size: 14,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.lock_rounded,
-                color: OzoneTheme.cyan,
-                size: 14,
+            ),
+            const SizedBox(width: 8),
+            QualityIndicatorWidget(
+              state: _callManager.qualityState,
+              callManager: _callManager,
+              durationText: _formatDuration(_callDurationSeconds),
+              onTap: () => showConnectionStatsModal(
+                context,
+                _callManager.qualityState,
+                callManager: _callManager,
               ),
-              const SizedBox(width: 8),
-              Text(
-                _formatDuration(_callDurationSeconds),
-                style: const TextStyle(
-                  color: OzoneTheme.emerald,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -258,10 +278,7 @@ class _CallScreenState extends State<CallScreen> {
             elevation: 0,
             mini: true,
             tooltip: 'End Call',
-            onPressed: () async {
-              await _callManager.endCall();
-              if (mounted) Navigator.of(context).pop();
-            },
+            onPressed: _handleEndCall,
             child: const Icon(Icons.call_end_rounded, size: 22),
           ),
         ],
@@ -438,26 +455,7 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                 ),
 
-              if (isConnected)
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8, right: 16),
-                      child: QualityIndicatorWidget(
-                        state: _callManager.qualityState,
-                        callManager: _callManager,
-                        onTap: () => showConnectionStatsModal(
-                          context,
-                          _callManager.qualityState,
-                          callManager: _callManager,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              if (isConnected) _buildTopCenterOverlay(),
+              if (isConnected) _buildTopBarOverlay(),
 
               if (!isFailed)
                 Positioned(
@@ -523,10 +521,7 @@ class _CallScreenState extends State<CallScreen> {
             elevation: 0,
             mini: true,
             tooltip: 'End Call',
-            onPressed: () async {
-              await _callManager.endCall();
-              if (mounted) Navigator.of(context).pop();
-            },
+            onPressed: _handleEndCall,
             child: const Icon(Icons.call_end_rounded),
           ),
         ],

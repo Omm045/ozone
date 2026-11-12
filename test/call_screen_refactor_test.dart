@@ -20,7 +20,7 @@ void main() {
       manager.dispose();
     });
 
-    test('SDP Munging: prioritizes High-Profile H.264, Baseline H.264, VP8, and fast start bitrate', () {
+    test('SDP Munging: prioritizes Baseline H.264, VP8 ahead of High-Profile H.264, and fast start bitrate', () {
       const sampleSdp =
           'v=0\r\n'
           'm=video 9 UDP/TLS/RTP/SAVPF 96 97 98 100\r\n'
@@ -34,8 +34,8 @@ void main() {
           'a=rtpmap:111 opus/48000/2\r\n';
 
       final munged = SdpUtils.optimizeSdp(sampleSdp);
-      // High-Profile H264 (96) and Baseline H264 (97) precede VP8 (98) and VP9 (100)
-      expect(munged, contains('m=video 9 UDP/TLS/RTP/SAVPF 96 97 98 100'));
+      // Constrained Baseline H264 (97) and VP8 (98) precede High-Profile H264 (96) and VP9 (100)
+      expect(munged, contains('m=video 9 UDP/TLS/RTP/SAVPF 97 98 96 100'));
       // Video bitrate floor/ceiling hints injected
       expect(munged, contains('x-google-min-bitrate=2500;x-google-start-bitrate=6000;x-google-max-bitrate=16000'));
       // Opus audio is tuned to 64kbps with FEC enabled
@@ -43,6 +43,7 @@ void main() {
     });
 
     test('Camera constraints support true 1080p start and dynamic 4K tiering', () {
+      CameraConstraintSelector.isMacOSOverrideForTesting = false;
       final constraints4k = CameraConstraintSelector.getMediaConstraintsForTier(
         ResolutionTier.p4k,
       );
@@ -58,10 +59,12 @@ void main() {
       expect(video720Mandatory['maxWidth'], '1280');
       expect(video720Mandatory['maxHeight'], '720');
       expect(video720Mandatory['maxFrameRate'], '30');
+      CameraConstraintSelector.clearCacheForTesting();
     });
 
     test('Front camera quality uses native resolution and aspect ratio, while back camera is untouched', () {
       CameraConstraintSelector.clearCacheForTesting();
+      CameraConstraintSelector.isMacOSOverrideForTesting = false;
 
       // 1. Back camera check: must be 100% untouched
       final backConstraints1080 = CameraConstraintSelector.getMediaConstraintsForTier(
@@ -110,7 +113,7 @@ void main() {
       CameraConstraintSelector.clearCacheForTesting();
     });
 
-    test('iOS camera constraints use safe W3C 1080p start and 4K dynamic upgrade without mandatory maps', () {
+    test('iOS camera constraints use safe W3C 1080p start without mandatory maps', () {
       CameraConstraintSelector.isIOSOverrideForTesting = true;
       final ios1080Constraints = CameraConstraintSelector.getMediaConstraintsForTier(
         ResolutionTier.p1080,
@@ -118,21 +121,12 @@ void main() {
       );
       final video1080 = ios1080Constraints['video'] as Map<String, dynamic>;
       expect(video1080['facingMode'], 'user');
-      expect(video1080['width'], {'ideal': 1920, 'max': 3840});
-      expect(video1080['height'], {'ideal': 1080, 'max': 2160});
-      expect(video1080['frameRate'], {'ideal': 30, 'max': 30});
+      expect(video1080['width'], {'ideal': 1920});
+      expect(video1080['height'], {'ideal': 1080});
+      expect(video1080['frameRate'], {'ideal': 30});
       expect(video1080.containsKey('mandatory'), isFalse);
       final optional1080 = video1080['optional'] as List;
       expect(optional1080.any((m) => m is Map && m['focusMode'] == 'continuous'), isTrue);
-
-      final ios4kConstraints = CameraConstraintSelector.getMediaConstraintsForTier(
-        ResolutionTier.p4k,
-        isFrontCamera: true,
-      );
-      final video4k = ios4kConstraints['video'] as Map<String, dynamic>;
-      expect(video4k['width'], {'ideal': 3840, 'max': 3840});
-      expect(video4k['height'], {'ideal': 2160, 'max': 2160});
-      expect(video4k.containsKey('mandatory'), isFalse);
 
       CameraConstraintSelector.clearCacheForTesting();
     });
@@ -169,6 +163,7 @@ void main() {
     });
 
     test('Force True 1080p/720p HD capture constraints and audio gain control flags', () {
+      CameraConstraintSelector.isMacOSOverrideForTesting = false;
       final constraints = CameraConstraintSelector.getMediaConstraints(
         tier: ResolutionTier.p1080,
         isFrontCamera: true,
@@ -197,6 +192,7 @@ void main() {
       expect(audioMandatory['googAutoGainControl'], 'true');
       expect(audioMandatory['googHighpassFilter'], 'true');
       expect(audioMandatory['googEchoCancellation'], 'true');
+      CameraConstraintSelector.clearCacheForTesting();
     });
 
     test('AdaptiveQualityController minimum 6Mbps bitrate on direct P2P and clean state format', () {

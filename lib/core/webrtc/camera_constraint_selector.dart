@@ -14,6 +14,8 @@ class CameraConstraintSelector {
   static final Map<bool, int> _cachedCameraMaxFps = {};
   static ({int width, int height, double aspectRatio})? _cachedFrontCameraNativeFormat;
   static bool? isIOSOverrideForTesting;
+  static bool? isMacOSOverrideForTesting;
+  static bool? isAndroidOverrideForTesting;
 
   static void setMockFrontCameraFormatForTesting({
     required int width,
@@ -149,6 +151,8 @@ class CameraConstraintSelector {
     _cachedCameraMaxFps.clear();
     _cachedFrontCameraNativeFormat = null;
     isIOSOverrideForTesting = null;
+    isMacOSOverrideForTesting = null;
+    isAndroidOverrideForTesting = null;
   }
 
   /// Exposes high-fidelity audio constraints for callers.
@@ -256,40 +260,72 @@ class CameraConstraintSelector {
     }
 
     final bool isIOS = isIOSOverrideForTesting ?? (!kIsWeb && Platform.isIOS);
+    final bool isAndroid = isAndroidOverrideForTesting ?? (!kIsWeb && Platform.isAndroid);
+    final bool isMacOS = isMacOSOverrideForTesting ??
+        (!kIsWeb &&
+            Platform.isMacOS &&
+            isIOSOverrideForTesting != true &&
+            isAndroidOverrideForTesting != true);
 
-    // On iOS, strictly use native W3C ideal/max dictionaries without mandatory maps
-    // or minWidth/minHeight rejection keys to prevent AVCaptureSession SIGABRT format negotiation crashes.
-    if (isIOS) {
-      final int idealWidth;
-      final int idealHeight;
-      final int maxWidth;
-      final int maxHeight;
-
-      if (tier >= ResolutionTier.p4k) {
-        idealWidth = 3840;
-        idealHeight = 2160;
-        maxWidth = 3840;
-        maxHeight = 2160;
-      } else if (tier == ResolutionTier.p720) {
-        idealWidth = 1280;
-        idealHeight = 720;
-        maxWidth = 1920;
-        maxHeight = 1080;
-      } else {
-        // Default 1080p start
-        idealWidth = 1920;
-        idealHeight = 1080;
-        maxWidth = 3840;
-        maxHeight = 2160;
-      }
-
+    // On macOS: Cap webcam capture to native 1920x1080 @ 30fps so AVFoundation locks
+    // onto crisp 1080p @ 30fps instead of falling back to 640x480 @ 20fps.
+    if (isMacOS) {
+      final facing = isFrontCamera ? 'user' : 'environment';
       return {
         'audio': audioConstraints,
         'video': {
-          'facingMode': isFrontCamera ? 'user' : 'environment',
-          'width': {'ideal': idealWidth, 'max': maxWidth},
-          'height': {'ideal': idealHeight, 'max': maxHeight},
-          'frameRate': {'ideal': 30, 'max': cappedFps},
+          'facingMode': facing,
+          'width': {'ideal': 1920, 'max': 1920},
+          'height': {'ideal': 1080, 'max': 1080},
+          'frameRate': {'ideal': 30, 'max': 30},
+          'optional': <Map<String, dynamic>>[
+            {'focusMode': 'continuous'},
+            {'exposureMode': 'continuous'},
+            {'whiteBalanceMode': 'continuous'},
+          ],
+        },
+      };
+    }
+
+    // On iOS, strictly use native W3C constraints without mandatory maps
+    // so AVCaptureSession never aborts with SIGABRT during format negotiation.
+    if (isIOS) {
+      final facing = isFrontCamera ? 'user' : 'environment';
+      return {
+        'audio': audioConstraints,
+        'video': {
+          'facingMode': facing,
+          'width': {'ideal': 1920},
+          'height': {'ideal': 1080},
+          'frameRate': {'ideal': 30},
+          'optional': <Map<String, dynamic>>[
+            {'focusMode': 'continuous'},
+            {'exposureMode': 'continuous'},
+            {'whiteBalanceMode': 'continuous'},
+          ],
+        },
+      };
+    }
+
+    // On Android: Pass both W3C keys and mandatory constraints with automatic fallback
+    // so Android Camera2Enumerator captures Full HD.
+    if (isAndroid) {
+      final facing = isFrontCamera ? 'user' : 'environment';
+      return {
+        'audio': audioConstraints,
+        'video': {
+          'facingMode': facing,
+          'width': {'ideal': 1920, 'max': 1920},
+          'height': {'ideal': 1080, 'max': 1080},
+          'frameRate': {'ideal': 30, 'max': 30},
+          'mandatory': {
+            'minWidth': '1280',
+            'minHeight': '720',
+            'maxWidth': '1920',
+            'maxHeight': '1080',
+            'minFrameRate': '24',
+            'maxFrameRate': '30',
+          },
           'optional': <Map<String, dynamic>>[
             {'focusMode': 'continuous'},
             {'exposureMode': 'continuous'},
@@ -459,9 +495,10 @@ class CameraConstraintSelector {
     int? maxFramerate,
   }) {
     return {
+      'minBitrate': 2500000,
       'maxBitrate': tier.targetBitrateBps,
-      'scaleResolutionDownBy': tier.scaleResolutionDownBy,
-      'maxFramerate': (maxFramerate ?? tier.targetFps).clamp(15, maxFpsLimit),
+      'scaleResolutionDownBy': 1.0,
+      'maxFramerate': 30,
     };
   }
 }

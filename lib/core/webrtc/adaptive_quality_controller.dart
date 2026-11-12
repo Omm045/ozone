@@ -6,7 +6,7 @@ enum ResolutionTier {
     targetFps: 30,
     targetBitrateBps: 2500000,
     minHeadroomForStepUpBps: 4500000,
-    scaleResolutionDownBy: 1.5,
+    scaleResolutionDownBy: 1.0,
   ),
   p1080(
     name: '1080p',
@@ -275,8 +275,9 @@ class AdaptiveQualityController {
   /// Formats raw connection state names (e.g. 'RTCPeerConnectionStateConnected') into clean lowercase names (e.g. 'connected').
   static String formatConnectionState(dynamic state) {
     if (state == null) return 'connected';
-    final rawName = state.toString().split('.').last;
-    return rawName.replaceAll('RTCPeerConnectionState', '').toLowerCase();
+    final str = state.toString();
+    final clean = str.split('RTCPeerConnectionState').last.split('.').last.toLowerCase();
+    return clean.isEmpty ? 'connected' : clean;
   }
 
   /// Calculates the target bitrate for encoding parameters.

@@ -161,7 +161,8 @@ void main() {
 
       final p720Params = CameraConstraintSelector.getEncodingParameters(ResolutionTier.p720);
       expect(p720Params['maxBitrate'], 2500000);
-      expect(p720Params['scaleResolutionDownBy'], 1.5);
+      expect(p720Params['minBitrate'], 2500000);
+      expect(p720Params['scaleResolutionDownBy'], 1.0);
 
       final p4kParams = CameraConstraintSelector.getEncodingParameters(ResolutionTier.p4k);
       expect(p4kParams['maxBitrate'], 16000000);

@@ -7,12 +7,14 @@ class QualityIndicatorWidget extends StatelessWidget {
   final QualityIndicatorState state;
   final VoidCallback? onTap;
   final WebRtcCallManager? callManager;
+  final String? durationText;
 
   const QualityIndicatorWidget({
     super.key,
     required this.state,
     this.onTap,
     this.callManager,
+    this.durationText,
   });
 
   Widget _buildSignalBars(int strength) {
@@ -37,6 +39,10 @@ class QualityIndicatorWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayText = durationText != null
+        ? '$durationText · ${state.fps}fps'
+        : '${state.tier.name} · ${state.fps}fps';
+
     return GestureDetector(
       onTap: () {
         if (onTap != null) {
@@ -48,7 +54,7 @@ class QualityIndicatorWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.65),
+          color: const Color(0x99000000),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: OzoneTheme.emerald.withValues(alpha: 0.5),
@@ -61,7 +67,7 @@ class QualityIndicatorWidget extends StatelessWidget {
             _buildSignalBars(state.signalStrength),
             const SizedBox(width: 8),
             Text(
-              '${state.tier.name} · ${state.fps}fps',
+              displayText,
               style: const TextStyle(
                 color: OzoneTheme.emerald,
                 fontSize: 12,
@@ -179,7 +185,10 @@ void showConnectionStatsModal(
                     telemetry.routeType,
                     valueColor: routeColor,
                   ),
-                  _buildTelemetryRow('State:', telemetry.connectionState),
+                  _buildTelemetryRow(
+                    'State:',
+                    AdaptiveQualityController.formatConnectionState(telemetry.connectionState),
+                  ),
 
                   const SizedBox(height: 16),
                   const Divider(color: Colors.white12, height: 1),

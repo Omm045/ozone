@@ -188,6 +188,60 @@ class WebRtcCallManager extends ChangeNotifier {
     return myUid.compareTo(peerUid) > 0;
   }
 
+  /// Strict call state reset executed at the start of every outgoing/incoming call,
+  /// on hangup, and on dispose to prevent orphaned subscriptions, stale candidates,
+  /// or lingering peer connections from breaking subsequent calls.
+  void _resetCallState() {
+    _disconnectGraceTimer?.cancel();
+    _disconnectGraceTimer = null;
+    _connectionTimeoutTimer?.cancel();
+    _connectionTimeoutTimer = null;
+    _statsTimer?.cancel();
+    _statsTimer = null;
+    _callDocSubscription?.cancel();
+    _callDocSubscription = null;
+    _candidatesSubscription?.cancel();
+    _candidatesSubscription = null;
+
+    _remoteCandidateQueue.clear();
+    _isRemoteDescriptionSet = false;
+    _gatheredCandidateTypes.clear();
+    _hasGatheredHostCandidate = false;
+    _isLocalNetworkDenied = false;
+    _sessionLogs.clear();
+    _connectedPair = null;
+    _lastAppliedTier = null;
+    _connectedAt = null;
+
+    try {
+      if (localRenderer.srcObject != null) {
+        localRenderer.srcObject = null;
+      }
+    } catch (_) {}
+    try {
+      if (remoteRenderer.srcObject != null) {
+        remoteRenderer.srcObject = null;
+      }
+    } catch (_) {}
+
+    _localStream?.getTracks().forEach((t) {
+      try {
+        t.stop();
+      } catch (_) {}
+    });
+    try {
+      _localStream?.dispose();
+    } catch (_) {}
+    _localStream = null;
+
+    try {
+      _peerConnection?.close();
+      _peerConnection?.dispose();
+    } catch (_) {}
+    _peerConnection = null;
+    _videoSender = null;
+  }
+
   Future<void> startOutgoingCall({
     required UserModel caller,
     required UserModel callee,
@@ -199,22 +253,11 @@ class WebRtcCallManager extends ChangeNotifier {
     }
     _isStartingCall = true;
     try {
-      if (_currentSession != null) {
-        _endCallInternal(status: CallStatus.ended);
-      }
+      _resetCallState();
 
     _isCaller = true;
     _status = CallStatus.ringing;
     _failureReason = null;
-    _hasGatheredHostCandidate = false;
-    _isLocalNetworkDenied = false;
-    _gatheredCandidateTypes.clear();
-    _remoteCandidateQueue.clear();
-    _isRemoteDescriptionSet = false;
-    _sessionLogs.clear();
-    _connectedPair = null;
-    _lastAppliedTier = null;
-    _connectedAt = null;
 
     _log('Starting outgoing ${callType.name} call to ${callee.email}');
     notifyListeners();
@@ -330,9 +373,7 @@ class WebRtcCallManager extends ChangeNotifier {
     }
     _isStartingCall = true;
     try {
-      if (_currentSession != null && _currentSession!.id != session.id) {
-        _endCallInternal(status: CallStatus.ended);
-      }
+      _resetCallState();
 
       // 1) Stop any ringtone/system sound first and settle audio session
       await Future.delayed(const Duration(milliseconds: 150));
@@ -341,15 +382,6 @@ class WebRtcCallManager extends ChangeNotifier {
     _currentSession = session;
     _status = CallStatus.connecting;
     _failureReason = null;
-    _hasGatheredHostCandidate = false;
-    _isLocalNetworkDenied = false;
-    _gatheredCandidateTypes.clear();
-    _remoteCandidateQueue.clear();
-    _isRemoteDescriptionSet = false;
-    _sessionLogs.clear();
-    _connectedPair = null;
-    _lastAppliedTier = null;
-    _connectedAt = null;
 
     _log('Accepting incoming ${session.isAudioOnly ? "audio" : "video"} call ${session.id} from ${session.callerEmail}');
     notifyListeners();
@@ -1023,6 +1055,31 @@ class WebRtcCallManager extends ChangeNotifier {
         telemetry: _latestTelemetry,
       );
 
+      // If Direct P2P downscales, immediately enforce scaleResolutionDownBy = 1.0 and minBitrate = 2.5 Mbps
+      if (_videoSender != null && routeType == 'Direct P2P') {
+        try {
+          final params = _videoSender!.parameters;
+          var needsReset = false;
+          final encs = params.encodings;
+          if (encs != null) {
+            for (final enc in encs) {
+              if ((enc.scaleResolutionDownBy ?? 1.0) > 1.0) {
+                enc.scaleResolutionDownBy = 1.0;
+                enc.minBitrate = 2500000;
+                needsReset = true;
+              }
+            }
+          }
+          if (needsReset) {
+            params.degradationPreference = RTCDegradationPreference.MAINTAIN_RESOLUTION;
+            await _videoSender!.setParameters(params);
+            _log('Direct P2P: Reset scaleResolutionDownBy = 1.0 and minBitrate = 2500000');
+          }
+        } catch (e) {
+          _log('Error checking/resetting scaleResolutionDownBy: $e');
+        }
+      }
+
       _statsCounter++;
       if (_statsCounter % 3 == 0) {
         _log(
@@ -1056,19 +1113,19 @@ class WebRtcCallManager extends ChangeNotifier {
           routeType: _connectedPair ?? 'Direct P2P',
           rttMs: _latestTelemetry.roundTripTimeMs.toDouble(),
         );
-        final int targetFps = (_nativeMaxFps > 0 ? _nativeMaxFps : tier.targetFps);
 
         for (final encoding in encodings) {
+          encoding.minBitrate = 2500000;
           encoding.maxBitrate = maxBitrate;
-          encoding.maxFramerate = targetFps;
-          encoding.scaleResolutionDownBy = tier.scaleResolutionDownBy;
+          encoding.maxFramerate = 30;
+          encoding.scaleResolutionDownBy = 1.0;
         }
         parameters.degradationPreference = RTCDegradationPreference.MAINTAIN_RESOLUTION;
         _videoSender!.setParameters(parameters);
         _lastAppliedTier = tier;
         _log(
           'Applied RTCRtpSender encoding parameters for $tier: '
-          'maxBitrate=$maxBitrate bps, maxFramerate=$targetFps, scaleDown=${tier.scaleResolutionDownBy}, '
+          'minBitrate=2500000 bps, maxBitrate=$maxBitrate bps, maxFramerate=30, scaleDown=1.0, '
           'degradationPreference=MAINTAIN_RESOLUTION',
         );
       }
@@ -1228,60 +1285,23 @@ class WebRtcCallManager extends ChangeNotifier {
   }
 
   Future<void> endCall() async {
-    final sessionId = _currentSession?.id;
-    if (_currentSession != null) {
-      await _firestore.collection('calls').doc(_currentSession!.id).update({
-        'status': CallStatus.ended.name,
-      }).catchError((_) {});
-    }
-    if (sessionId != null) {
-      await _cleanupCallSignaling(sessionId);
-    }
+    final session = _currentSession;
     _endCallInternal(status: CallStatus.ended);
+
+    if (session != null) {
+      unawaited(() async {
+        try {
+          await _firestore.collection('calls').doc(session.id).update({
+            'status': CallStatus.ended.name,
+          });
+        } catch (_) {}
+        await _cleanupCallSignaling(session.id);
+      }());
+    }
   }
 
   void _endCallInternal({required CallStatus status, String? reason}) {
-    _disconnectGraceTimer?.cancel();
-    _disconnectGraceTimer = null;
-    _statsTimer?.cancel();
-    _connectionTimeoutTimer?.cancel();
-    _callDocSubscription?.cancel();
-    _candidatesSubscription?.cancel();
-
-    _remoteCandidateQueue.clear();
-    _isRemoteDescriptionSet = false;
-    _connectedAt = null;
-
-    // Clear renderers before closing tracks to prevent texture render exceptions
-    try {
-      if (localRenderer.srcObject != null) {
-        localRenderer.srcObject = null;
-      }
-    } catch (_) {}
-    try {
-      if (remoteRenderer.srcObject != null) {
-        remoteRenderer.srcObject = null;
-      }
-    } catch (_) {}
-
-    // Stop and dispose local media tracks cleanly
-    _localStream?.getTracks().forEach((t) {
-      try {
-        t.stop();
-      } catch (_) {}
-    });
-    try {
-      _localStream?.dispose();
-    } catch (_) {}
-    _localStream = null;
-
-    try {
-      _peerConnection?.close();
-      _peerConnection?.dispose();
-    } catch (_) {}
-    _peerConnection = null;
-    _videoSender = null;
-    _lastAppliedTier = null;
+    _resetCallState();
 
     _status = status;
     if (reason != null) {
@@ -1305,9 +1325,7 @@ class WebRtcCallManager extends ChangeNotifier {
   void dispose() {
     if (_isDisposed) return;
     _isDisposed = true;
-    _disconnectGraceTimer?.cancel();
-    _disconnectGraceTimer = null;
-    _statsTimer?.cancel();
+    _resetCallState();
     _endCallInternal(status: CallStatus.ended);
     try {
       localRenderer.srcObject = null;
